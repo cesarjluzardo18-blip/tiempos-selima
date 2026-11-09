@@ -1,0 +1,782 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Tiempos Selima</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tiempos">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#F3F6F8">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0;font-size:14px;font-family:system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: una columna tipo libreta de ruta — buscador fijo, pueblos en fila, fichas por cliente, hoja inferior para el detalle */
+:root{
+  --bg:#F3F6F8; --surface:#FFFFFF; --ink:#14212C; --muted:#5D6B78; --line:#DCE3E9;
+  --accent:#F2BE22; --accent-ink:#1B1606; --accent-soft:#FDF3D2; --water:#1F6E8C; --danger:#B3382C;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E151C; --surface:#16212B; --ink:#E6EDF2; --muted:#93A3B1; --line:#263441;
+  --accent:#F2BE22; --accent-ink:#1B1606; --accent-soft:#3A3115; --water:#5FB4D4; --danger:#E0695C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E151C; --surface:#16212B; --ink:#E6EDF2; --muted:#93A3B1; --line:#263441;
+  --accent:#F2BE22; --accent-ink:#1B1606; --accent-soft:#3A3115; --water:#5FB4D4; --danger:#E0695C; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--body);font-size:16px;line-height:1.4;-webkit-tap-highlight-color:transparent}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 8px;border-bottom:1px solid var(--line)}
+.wrap{max-width:760px;margin:0 auto}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{white-space:nowrap;font-family:var(--display);font-weight:700;font-size:28px;letter-spacing:.01em;margin:0;line-height:1}
+h1 span{color:var(--muted);font-weight:500}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--danger)}
+.search{margin-top:10px;position:relative}
+.who{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:8px}
+#me{font-weight:600;font-size:16px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#me:empty::before{content:"\00a0"}
+#clock{font-family:var(--display);font-weight:700;font-size:26px;line-height:1;flex:none}
+#clock small{font-family:var(--body);font-size:13px;font-weight:500;color:var(--muted);margin-right:6px}
+.search input{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:12px 14px 12px 40px;font-size:17px}
+.search svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 12px;font-size:14px;font-weight:500;white-space:nowrap}
+.chip b{font-weight:600;color:var(--muted);margin-left:4px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip[aria-pressed="true"] b{color:inherit;opacity:.7}
+
+main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:8px 96px}
+.meta{display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;color:var(--muted);font-size:14px;padding:6px 0}
+.meta select{border:none;background:transparent;color:var(--muted);font-weight:600}
+.group h2{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 6px;display:flex;gap:8px;align-items:baseline}
+.group h2 small{letter-spacing:0;text-transform:none;font-family:var(--body);font-weight:500}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;width:100%;text-align:left;border:0;background:transparent;padding:11px 14px;border-top:1px solid var(--line)}
+.row:first-child{border-top:0}
+@media (hover:hover){.row:hover{background:var(--accent-soft)}}
+.row:active{background:var(--accent-soft)}
+.row .name{font-weight:600;min-width:0}
+.row .sub{grid-column:1;color:var(--muted);font-size:14px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .tot{grid-row:1/3;grid-column:2;align-self:center;text-align:right;font-family:var(--display);font-weight:600;font-size:20px;line-height:1}
+.row .tot small{display:block;font-family:var(--body);font-size:12px;color:var(--muted);font-weight:500;margin-top:3px}
+.flag{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--water);margin-left:6px;vertical-align:middle}
+.empty{text-align:center;color:var(--muted);padding:48px 16px}
+.empty strong{display:block;color:var(--ink);font-size:18px;margin-bottom:6px}
+.status{font-size:13px;color:var(--muted)}
+
+.fab{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:6;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);padding:13px 20px;font-size:16px}
+
+/* hoja */
+.scrim{position:fixed;inset:0;background:rgba(10,16,22,.45);z-index:20}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;max-height:92%;overflow-y:auto;background:var(--bg);
+  border-radius:16px 16px 0 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:10px calc(24px + env(safe-area-inset-bottom,0px))}
+@media (min-width:800px){.sheet{left:50%;transform:translateX(-50%);width:720px;bottom:auto;top:5%;border-radius:16px;max-height:90%}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 10px}
+.sh-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sh-head h3{font-family:var(--display);font-size:30px;font-weight:700;line-height:1.05;margin:0;text-wrap:balance}
+.sh-head p{margin:4px 0 0;color:var(--muted);font-size:14px}
+.tasks{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.task{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
+.task:first-child{border-top:0}
+.task input{width:20px;height:20px;accent-color:var(--water)}
+.task .tn{min-width:0}
+.task .tt{text-align:right;font-family:var(--display);font-weight:600;font-size:20px;line-height:1.05;white-space:nowrap}
+.task .tt small{display:block;font-family:var(--body);font-size:12px;color:var(--muted);font-weight:500}
+.calc{margin-top:12px;background:var(--accent-soft);border-radius:var(--r);padding:14px;display:grid;gap:10px}
+.calc .big{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.calc .big span{color:var(--muted);font-size:14px}
+.calc .big b{font-family:var(--display);font-size:30px;font-weight:700}
+.stepper{display:flex;align-items:center;gap:8px}
+.stepper button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--surface);font-size:20px;line-height:1}
+.stepper output{min-width:22px;text-align:center;font-weight:600;font-size:18px}
+.note{margin-top:12px;padding:12px 14px;border-left:3px solid var(--water);background:var(--surface);border-radius:0 var(--r) var(--r) 0;white-space:pre-wrap}
+.foot{display:flex;gap:8px;flex-wrap:wrap;justify-content:space-between;align-items:center;margin-top:16px}
+.foot .by{color:var(--muted);font-size:14px}
+.confirm{margin-top:10px;padding:12px;border:1px solid var(--danger);border-radius:var(--r);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+/* formulario */
+form{display:grid;gap:12px;margin-top:10px}
+form label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted)}
+.in{width:100%;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:10px 12px;font-size:16px;color:var(--ink);font-weight:400}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+.two .in{min-width:0}
+@media (max-width:480px){.two.dt{grid-template-columns:1fr}}
+.trow{display:grid;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.trow .thead{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600;color:var(--muted)}
+.trow .x{border:0;background:transparent;color:var(--muted);font-size:22px;line-height:1;padding:0 4px}
+.tipos{display:flex;flex-wrap:wrap;gap:6px}
+.tipo{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 13px;font-size:15px;font-weight:500}
+.tipo[aria-pressed="true"]{background:var(--water);border-color:var(--water);color:#fff}
+.tipo.nuevo{border-style:dashed;color:var(--muted);background:transparent}
+.newtipo{display:flex;gap:6px}
+.newtipo input{flex:1;min-width:0}
+.tfields{display:grid;grid-template-columns:1fr 88px 64px;gap:8px;align-items:end}
+.tprev{font-size:14px;color:var(--ink);font-weight:500;min-height:1.2em}
+.tprev:empty::before{content:"Elige qué se limpia";color:var(--muted);font-weight:400}
+.hint{font-size:13px;color:var(--muted);font-weight:400}
+@media (max-width:420px){.tfields{grid-template-columns:1fr 78px 56px}}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
+@media (prefers-reduced-motion:no-preference) and (min-width:800px){.sheet{animation:none}}
+/* vistas, avisos, mapa, cronómetro, fotos */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--line);padding:3px;border-radius:10px;margin-top:10px}
+.tabs button{border:0;background:transparent;border-radius:8px;padding:8px;font-weight:600;color:var(--muted)}
+.tabs button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tabs b{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:999px;background:var(--accent);color:var(--accent-ink);font-size:12px;line-height:18px}
+.tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.02em;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--ink);border:1px solid var(--accent);margin-left:6px;vertical-align:2px;white-space:nowrap}
+.tag.warn{background:transparent;border-color:var(--danger);color:var(--danger)}
+.star{color:var(--water);margin-left:6px;font-size:13px;font-weight:700;vertical-align:1px}
+.avisos{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.avisos .tag{margin:0;font-size:13px;padding:3px 10px}
+.place{margin-top:12px;display:grid;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.place .addr{font-weight:500}
+.maps{display:flex;gap:8px;flex-wrap:wrap}
+.maps a{text-decoration:none;color:inherit}
+.claves{margin-top:12px;background:var(--surface);border:1px dashed var(--danger);border-radius:var(--r);padding:10px 14px;display:grid;gap:6px}
+.claves pre{margin:0;font-family:var(--body);white-space:pre-wrap;font-size:17px;font-weight:600}
+.sect{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:18px 0 6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sect .btn{font-family:var(--body);letter-spacing:0;text-transform:none;font-size:14px;padding:5px 12px}
+.crono{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:10px}
+.crono .clock{font-family:var(--display);font-size:34px;font-weight:700;line-height:1}
+.crono.run{border-color:var(--water);box-shadow:inset 4px 0 0 var(--water)}
+.cronobar{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;margin:8px 0 4px;border:0;border-radius:var(--r);padding:10px 14px;background:var(--water);color:#fff;text-align:left;font-weight:600}
+.cronobar span:last-child{font-family:var(--display);font-size:22px}
+.fotos{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.fotos button{padding:0;border:0;border-radius:8px;overflow:hidden;aspect-ratio:1;background:var(--line);max-width:100%}
+.fotos .hint{grid-column:1/-1}
+.fotos img{width:100%;height:100%;object-fit:cover;display:block}
+.viewer{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.92);display:grid;place-items:center;padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(16px + env(safe-area-inset-bottom,0px))}
+.viewer img{max-width:100%;max-height:78vh;border-radius:8px}
+.viewer .vb{display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap}
+.viewer p{color:#ddd;text-align:center;margin:8px 0 0;font-size:14px}
+.hist{display:grid}
+.hist div{display:flex;justify-content:space-between;gap:10px;padding:9px 14px;border-top:1px solid var(--line);font-size:15px}
+.hist div:first-child{border-top:0}
+.done .name{text-decoration:line-through;color:var(--muted)}
+.dayhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 10px}
+.dayhead b{font-family:var(--display);font-size:24px}
+.check{width:30px;height:30px;border-radius:50%;border:2px solid var(--line);background:var(--surface);flex:none;font-size:16px;line-height:1;color:#fff}
+.check[aria-pressed="true"]{background:var(--water);border-color:var(--water)}
+.dayrow{display:flex;align-items:center;gap:10px;padding-left:12px;border-top:1px solid var(--line)}
+.dayrow:first-child{border-top:0}
+.dayrow .row{border-top:0;padding-left:0}
+.avsel{display:flex;flex-wrap:wrap;gap:6px}
+/* cuentas, en línea, actividad */
+.dot{width:9px;height:9px;border-radius:50%;background:#2E9E5B;box-shadow:0 0 0 3px rgba(46,158,91,.18);flex:none}
+.dot.off{background:var(--line);box-shadow:none}
+body.auth-on>header,body.auth-on>main,body.auth-on>.fab{display:none!important}
+.auth{min-height:100vh;display:grid;place-items:center;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px}
+.authbox{width:100%;max-width:400px;display:grid;gap:16px}
+.authbox h1{font-size:40px;text-align:center}
+.authbox form{display:grid;gap:12px;margin:0}
+.authbox .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:12px}
+.authbox .err{color:var(--danger);font-size:14px;margin:0}
+.linkbtn{border:0;background:transparent;color:var(--water);font-weight:600;padding:4px;justify-self:center}
+.prow{display:flex;align-items:center;gap:10px;padding:11px 14px;border-top:1px solid var(--line)}
+.prow:first-child{border-top:0}
+.prow .pn{flex:1;min-width:0}
+.prow .pn b{display:block;font-weight:600}
+.prow .pn>span{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.prow .pb{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.prow .pb .btn{padding:6px 11px;font-size:14px}
+.act{display:grid;gap:2px;padding:10px 14px;border-top:1px solid var(--line)}
+.act:first-child{border-top:0}
+.act small{color:var(--muted);font-size:13px}
+.act .d{font-size:13px;color:var(--muted)}
+</style>
+
+<header>
+  <div class="wrap">
+    <div class="top">
+      <h1>Tiempos <span>Selima</span></h1>
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <button class="btn" id="share" style="padding:7px 12px;font-size:14px;display:flex;align-items:center;gap:6px"><span class="dot"></span><span id="onN" class="num">1</span> en línea</button>
+      </div>
+    </div>
+    <div class="who"><span id="me"></span><span id="clock" class="num"></span></div>
+    <div class="search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="q" type="search" placeholder="Buscar casa, local, calle, trabajo…" autocomplete="off">
+    </div>
+    <div class="tabs" role="tablist"><button id="tab-todos" aria-pressed="true">Todos</button><button id="tab-dia" aria-pressed="false">Mi día<b id="diaN" hidden></b></button></div>
+    <div class="chips" id="chips" role="toolbar" aria-label="Pueblos"></div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <button class="cronobar" id="cronobar" hidden></button>
+    <div class="meta"><span style="display:flex;gap:10px;align-items:center"><span id="count" class="num"></span><button class="btn ghost" id="trash" style="padding:4px 10px;font-size:13px" hidden></button><span id="status" class="status">Cargando…</span></span>
+      <label style="display:flex;gap:6px;align-items:center;font-weight:500">Orden
+        <select id="sort"><option value="pueblo">Por pueblo</option><option value="az">A–Z</option><option value="reciente">Recientes</option></select>
+      </label>
+    </div>
+    <div id="out"><div class="empty"><strong>Cargando tus tiempos…</strong>Aquí aparecerán todas las casas y locales con sus tiempos.</div></div>
+  </div>
+</main>
+<button class="btn primary fab" id="add">+ Añadir tiempo</button>
+<div id="layer"></div>
+<div id="auth" class="auth" hidden>
+  <div class="authbox">
+    <h1>Tiempos <span>Selima</span></h1>
+    <div id="auth-forms" class="card">
+      <div class="tabs" style="margin:0"><button type="button" id="a-login" aria-pressed="true">Entrar</button><button type="button" id="a-reg" aria-pressed="false">Registrarme</button></div>
+      <form id="af" novalidate>
+        <label id="a-nombre-l" hidden>Tu nombre<input class="in" id="a-nombre" autocomplete="name" placeholder="Como te llaman en el trabajo"></label>
+        <label>Correo<input class="in" id="a-email" type="email" autocomplete="email" inputmode="email" placeholder="tu@correo.com"></label>
+        <label>Contraseña<input class="in" id="a-pass" type="password" autocomplete="current-password" placeholder="Mínimo 6 caracteres"></label>
+        <p id="aerr" class="err" hidden></p>
+        <button class="btn primary" type="submit" id="a-go" style="padding:12px">Entrar</button>
+      </form>
+      <button type="button" class="linkbtn" id="a-reset">¿Has olvidado la contraseña?</button>
+    </div>
+    <div id="auth-wait" class="card" hidden>
+      <b style="font-size:20px" id="w-title">Esperando aprobación</b>
+      <span id="w-text">Tu cuenta está creada. Cuando el administrador te acepte, entrarás directamente a la app. No hace falta que hagas nada más.</span>
+      <button class="btn" type="button" id="w-out" style="justify-self:start">Cerrar sesión</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+const $=s=>document.querySelector(s);
+let DB=null, COL=null, USER=null, ME=null, ALL=[], TRASH=[], zona="Todos", q="", sort="pueblo";
+let VIEW="todos", MIDIA={fecha:"",ids:[],hechos:[],ops:{}}, CRONO=null, DIADOC=null, CRONODOC=null, VIS=null, FOT=null, ONLINE=false;
+const AVISOS=["Alarma","Llaves","Avisar antes","Sin almuerzo"];
+const WARN=new Set(["Alarma","Avisar antes"]);
+const today=()=>{ const d=new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}` };
+function pad2(n){ return String(n).padStart(2,"0") }
+const pad=n=>String(n).padStart(2,"0");
+const whenStr=c=>{ if(c.cuando){ const d=new Date(c.cuando); if(!isNaN(d)) return `${d.getDate()}/${d.getMonth()+1}/${String(d.getFullYear()).slice(2)} · ${pad(d.getHours())}:${pad(d.getMinutes())}` } return c.fecha? fdate(c.fecha):"" };
+const sortKey=c=> c.cuando || (c.fecha? c.fecha+"T00:00":"");
+const localInput=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+let USERS={};
+async function nameOf(id,fallback){ return (id&&USERS[id]&&USERS[id].nombre)||fallback||"" }
+try{ sort=localStorage.getItem("ts-sort")||"pueblo"; $("#sort").value=sort }catch(e){}
+
+const fmt=m=>{ if(m==null) return "—"; m=Math.round(m); const h=Math.floor(m/60), r=m%60; return h? (r? `${h} h ${r}`:`${h} h`) : `${r} min`; };
+const tot=t=> t.min==null? null : t.min*(t.ops||1);
+const total=c=> (c.tareas||[]).reduce((s,t)=>s+(tot(t)||0),0);
+const norm=s=>(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fdate=d=>{ if(!d) return ""; const [y,m,dd]=d.split("-"); return `${+dd}/${+m}/${y.slice(2)}` };
+function parseTime(s){ s=(s||"").toLowerCase().replace(/\s/g,"").replace(",","."); if(!s) return null;
+  let m=s.match(/^(\d+)[h:](\d{1,2})?(?:m|min)?$/); if(m) return +m[1]*60+(+m[2]||0);
+  m=s.match(/^(\d+(?:\.\d+)?)h$/); if(m) return Math.round(+m[1]*60);
+  m=s.match(/^(\d+)(?:m|min)?$/); if(m) return +m[1]; return NaN; }
+const timeStr=m=>{ if(m==null) return ""; const h=Math.floor(m/60), r=m%60; return h? `${h}h${r?String(r).padStart(2,"0"):""}`:`${r}`; };
+function logAct(accion,cliente,clienteId,extra){ if(!ME||!window.FB) return; const a={accion,cliente:cliente||"",clienteId:clienteId||"",por:ME.name||"",porId:ME.id,cuando:new Date().toISOString()}; if(extra) a.detalle=extra; FB.db.collection("actividad").add(a).catch(()=>{}) }
+function toast(t){ const el=document.createElement("div"); el.className="toast"; el.textContent=t; document.body.append(el); setTimeout(()=>el.remove(),2200) }
+
+function chips(){
+  const c={}; ALL.forEach(x=>c[x.zona]=(c[x.zona]||0)+1);
+  const zs=Object.keys(c).sort((a,b)=> a==="Sin pueblo"?1: b==="Sin pueblo"?-1: c[b]-c[a]);
+  $("#chips").innerHTML=[["Todos",ALL.length],...zs.map(z=>[z,c[z]])].map(([z,n])=>
+    `<button class="chip" aria-pressed="${z===zona}" data-z="${esc(z)}">${esc(z)}<b class="num">${n}</b></button>`).join("");
+}
+function match(c){
+  if(zona!=="Todos" && c.zona!==zona) return false;
+  if(!q) return true;
+  const hay=norm([c.cliente,c.zona,c.barrio,c.direccion,c.nota,c.autor,...(c.avisos||[]),...(c.tareas||[]).map(t=>t.n)].join(" "));
+  return norm(q).split(/\s+/).every(w=>hay.includes(w));
+}
+function rowHTML(c){
+  const ts=c.tareas||[], T=total(c);
+  const sub=ts.length? ts.map(t=>t.n).join(" · ") : "Sin tiempo anotado";
+  const tt= ts.length===1 && ts[0].ops ? `${fmt(ts[0].min)} <small>× ${ts[0].ops}</small>` :
+            T? `${fmt(T)} <small>${ts.length>1? ts.length+" trabajos":"total"}</small>` : `— <small>${ts[0]?.texto? "ver ficha":""}</small>`;
+  const tags=(c.avisos||[]).map(a=>`<span class="tag${WARN.has(a)?" warn":""}">${esc(a)}</span>`).join("");
+  return `<button class="row" data-id="${esc(c.id)}"><span class="name">${esc(c.cliente)}${MIDIA.ids.includes(c.id)?'<span class="star" title="En Mi día">★</span>':""}${c.nota?'<span class="flag" title="Tiene nota"></span>':""}${tags}</span>
+    <span class="tot num">${tt}</span><span class="sub">${c.barrio?esc(c.barrio)+" · ":""}${esc(sub)}</span></button>`;
+}
+const defOps=c=>{ const o=[...new Set((c.tareas||[]).filter(t=>t.ops).map(t=>t.ops))]; return o.length===1? o[0] : 2 };
+const opsDia=c=> (MIDIA.ops&&MIDIA.ops[c.id]) || defOps(c);
+function renderDia(){
+  const n=MIDIA.ids.length; $("#diaN").hidden=!n; $("#diaN").textContent=n;
+  if(VIEW!=="dia") return;
+  const L=MIDIA.ids.map(id=>ALL.find(c=>c.id===id)).filter(Boolean);
+  $("#count").textContent=`${L.length} ${L.length===1?"sitio":"sitios"} · ${MIDIA.hechos.filter(h=>MIDIA.ids.includes(h)).length} hechos`;
+  if(!L.length){ $("#out").innerHTML=`<div class="empty"><strong>Tu día está vacío</strong>Abre una casa o local y pulsa «Añadir a Mi día». Solo tú ves esta lista.</div>`; return }
+  const pp=c=> total(c)/opsDia(c), done=c=>MIDIA.hechos.includes(c.id);
+  const T=L.reduce((s,c)=>s+total(c),0), P=L.reduce((s,c)=>s+pp(c),0), QP=L.filter(c=>!done(c)).reduce((s,c)=>s+pp(c),0), QT=L.filter(c=>!done(c)).reduce((s,c)=>s+total(c),0);
+  const fd=MIDIA.fecha&&MIDIA.fecha!==today()? `Lista del ${fdate(MIDIA.fecha)}` : "Hoy";
+  $("#out").innerHTML=`<div class="dayhead"><div><span class="hint" style="font-size:14px">${fd} · tiempo de cada uno</span><br><b class="num">${fmt(P)}</b> <span class="hint num" style="font-size:14px">· quedan ${fmt(QP)} cada uno</span><br>
+      <span class="hint num" style="font-size:14px">${fmt(T)} en total entre todos · quedan ${fmt(QT)}</span></div>
+    <button class="btn" id="newday">Empezar día nuevo</button></div>
+    <div class="list">${L.map(c=>{ const o=opsDia(c); return `<div class="dayrow ${done(c)?"done":""}"><button class="check" data-h="${esc(c.id)}" aria-pressed="${done(c)}" aria-label="Marcar hecho">✓</button>
+      <div style="flex:1;min-width:0;padding:10px 14px 10px 0;display:grid;gap:6px">
+        <button class="row" data-id="${esc(c.id)}" style="padding:0;grid-template-columns:1fr auto"><span class="name">${esc(c.cliente)}</span><span class="tot num">${fmt(total(c)/o)}<small>cada uno</small></span><span class="sub">${esc(c.zona)} · ${fmt(total(c))} en total</span></button>
+        <div class="stepper" style="gap:6px"><button type="button" data-o="${esc(c.id)}" data-d="-1" aria-label="Menos personas" style="width:30px;height:30px;font-size:17px">−</button><output class="num" style="font-size:16px">${o}</output><button type="button" data-o="${esc(c.id)}" data-d="1" aria-label="Más personas" style="width:30px;height:30px;font-size:17px">+</button><span class="hint" style="font-size:13px">personas</span></div>
+      </div></div>` }).join("")}</div>
+    <p class="hint" style="margin-top:10px">El tiempo de cada uno es el total anotado de cada sitio dividido entre las personas que vais. Cambia el número en cada sitio.</p>`;
+  $("#newday").onclick=()=>{ if($("#newday").dataset.ok){ saveDia({fecha:today(),ids:[],hechos:[],ops:{}}); toast("Día nuevo empezado") } else { $("#newday").dataset.ok="1"; $("#newday").textContent="¿Vaciar la lista? Toca otra vez" } };
+  document.querySelectorAll("[data-o]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const c=ALL.find(x=>x.id===b.dataset.o); if(!c) return;
+    const v=Math.min(9,Math.max(1,opsDia(c)+(+b.dataset.d))); saveDia({...MIDIA,ops:{...(MIDIA.ops||{}),[c.id]:v}}) });
+}
+async function saveDia(m){ if(!m.ops) m.ops=MIDIA.ops||{}; MIDIA=m; render(); if(!DIADOC){ toast("Mi día necesita conexión"); return } try{ await DIADOC.set(MIDIA) }catch(e){ toast("No se pudo guardar Mi día") } }
+function render(){
+  chips(); renderDia();
+  $("#chips").hidden=VIEW==="dia";
+  if(VIEW==="dia") return;
+  let L=ALL.filter(match);
+  $("#count").textContent=`${L.length} ${L.length===1?"cliente":"clientes"}`;
+  if(!ALL.length){ $("#out").innerHTML=`<div class="empty"><strong>Todavía no hay tiempos</strong>Pulsa «Añadir tiempo» para anotar la primera casa o local.</div>`; return }
+  if(!L.length){ $("#out").innerHTML=`<div class="empty"><strong>Nada con «${esc(q)}»</strong>Prueba con otra palabra o quita el filtro de pueblo.</div>`; return }
+  const by=(a,b)=>a.cliente.localeCompare(b.cliente,"es");
+  if(sort==="az"){ $("#out").innerHTML=`<div class="list">${L.sort(by).map(rowHTML).join("")}</div>`; return }
+  if(sort==="reciente"){ $("#out").innerHTML=`<div class="list">${L.sort((a,b)=>sortKey(b).localeCompare(sortKey(a))||by(a,b)).map(rowHTML).join("")}</div>`; return }
+  const g={}; L.forEach(c=>{const k=c.zona+(c.barrio?" · "+c.barrio:""); (g[k]=g[k]||[]).push(c)});
+  const keys=Object.keys(g).sort((a,b)=> a.startsWith("Sin pueblo")?1: b.startsWith("Sin pueblo")?-1: a.localeCompare(b,"es"));
+  $("#out").innerHTML=keys.map(k=>`<section class="group"><h2>${esc(k)} <small class="num">${g[k].length}</small></h2><div class="list">${g[k].sort(by).map(rowHTML).join("")}</div></section>`).join("");
+}
+
+/* ---------- detalle ---------- */
+let CUR=null;
+function close(){ $("#layer").innerHTML=""; document.body.style.overflow=""; CUR=null }
+function open(html){ $("#layer").innerHTML=`<div class="scrim" data-close></div><div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${html}</div>`; document.body.style.overflow="hidden" }
+function detail(id){
+  const c=ALL.find(x=>x.id===id); if(!c) return;
+  const ts=c.tareas||[]; let ops=2;
+  setTimeout(()=>{ CUR=id },0);
+  open(`<div class="sh-head"><div><h3>${esc(c.cliente)}</h3><p>${esc(c.zona)}${c.barrio?" · "+esc(c.barrio):""}</p></div>
+      <button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
+    ${(c.avisos||[]).length?`<div class="avisos">${c.avisos.map(a=>`<span class="tag${WARN.has(a)?" warn":""}">${esc(a)}</span>`).join("")}</div>`:""}
+    <div class="place">${c.direccion?`<span class="addr">${esc(c.direccion)}</span>`:`<span class="hint">Sin dirección. Pulsa «Editar» para añadirla.</span>`}
+      <div class="maps"><a class="btn" target="_blank" rel="noopener" href="https://waze.com/ul?q=${encodeURIComponent(mapQ(c))}&navigate=yes">Ir con Waze</a><a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQ(c))}">Google Maps</a><a class="btn" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(mapQ(c))}">Apple Maps</a>
+      <button class="btn" id="dia" type="button">${MIDIA.ids.includes(c.id)?"Quitar de Mi día":"+ Mi día"}</button></div></div>
+    <div class="tasks">${ts.length? ts.map((t,i)=>`<label class="task"><input type="checkbox" data-i="${i}" ${t.min!=null?"checked":"disabled"}>
+        <span class="tn" style="color:var(--ink);font-weight:500">${esc(t.n)}</span>
+        <span class="tt num">${t.min==null? `<span style="font-size:15px">${esc(t.texto||"—")}</span>` : t.ops? `${fmt(t.min)} × ${t.ops}<small>${fmt(tot(t))} en total</small>` : `${fmt(t.min)}<small>en total</small>`}</span></label>`).join("")
+      : `<div class="task"><span></span><span class="tn">Sin tiempo anotado</span><span></span></div>`}</div>
+    ${ts.some(t=>t.min!=null)?`<div class="calc"><div class="big"><span>Trabajo marcado</span><b class="num" id="cT"></b></div>
+      <div class="big" style="align-items:center"><div class="stepper"><button type="button" id="mn" aria-label="Menos operarios">−</button><output id="ops" class="num">2</output><button type="button" id="pl" aria-label="Más operarios">+</button><span style="color:var(--muted);font-size:14px">operarios</span></div>
+      <b class="num" id="cP" style="font-size:24px"></b></div></div>`:""}
+    ${c.nota?`<div class="note">${esc(c.nota)}</div>`:""}
+    <div class="sect">Cronómetro</div><div id="cronobox"></div>
+    <div class="sect">Fotos <span><label class="btn" style="display:inline-block;cursor:pointer">+ Foto<input type="file" accept="image/*" id="fotoin" hidden></label></span></div>
+    <div id="fotos" class="fotos"><span class="hint">Cargando fotos…</span></div>
+    <div class="sect">Tus tiempos guardados <span class="hint" style="font-family:var(--body);letter-spacing:0;text-transform:none;font-weight:400">solo los ves tú</span></div><div id="hist" class="tasks hist"><div><span class="hint">Cargando…</span></div></div>
+    <div class="foot"><span class="by" id="by">Anotado ${whenStr(c)?"el "+whenStr(c):""}${c.autor?" por "+esc(c.autor):""}</span>
+      <span style="display:flex;gap:8px"><button class="btn danger" id="del">Borrar</button><button class="btn primary" id="edit">Editar</button></span></div>
+    <div id="cf"></div>`);
+  const upd=()=>{ const sel=[...document.querySelectorAll(".task input:checked")].map(i=>tot(ts[+i.dataset.i])||0); const T=sel.reduce((a,b)=>a+b,0);
+    if($("#cT")){ $("#cT").textContent=fmt(T)+" en total"; $("#ops").textContent=ops; $("#cP").textContent=fmt(T/ops)+" cada uno" } };
+  document.querySelectorAll(".task input").forEach(i=>i.onchange=upd);
+  if($("#mn")){ $("#mn").onclick=()=>{ops=Math.max(1,ops-1);upd()}; $("#pl").onclick=()=>{ops=Math.min(9,ops+1);upd()} }
+  upd();
+  (async()=>{ const a=await nameOf(c.autorId,c.autor); let t=`Anotado ${whenStr(c)?"el "+whenStr(c):""}${a?" por "+a:""}`;
+    if(c.editado){ const e=await nameOf(c.editadoPorId,c.editadoPor); const d=new Date(c.editado); t+=` · Editado el ${d.getDate()}/${d.getMonth()+1} a las ${pad(d.getHours())}:${pad(d.getMinutes())}${e?" por "+e:""}` }
+    const el=document.getElementById("by"); if(el) el.textContent=t })();
+  $("#edit").onclick=()=>form(c);
+  $("#dia").onclick=()=>{ const has=MIDIA.ids.includes(c.id);
+    const m={fecha:MIDIA.fecha||today(),ids: has? MIDIA.ids.filter(x=>x!==c.id) : [...MIDIA.ids,c.id], hechos:MIDIA.hechos.filter(x=>x!==c.id||!has)};
+    saveDia(m); $("#dia").textContent= has? "+ Mi día":"Quitar de Mi día"; toast(has?"Quitado de Mi día":"Añadido a Mi día") };
+  cronoBox(c); loadFotos(c); loadHist(c);
+  $("#fotoin").onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f) addFoto(c,f); e.target.value="" };
+  $("#del").onclick=()=>{ $("#cf").innerHTML=`<div class="confirm"><span style="flex:1">¿Mover «${esc(c.cliente)}» a la papelera? Se puede recuperar.</span><button class="btn" id="no">Cancelar</button><button class="btn primary" style="background:var(--danger);color:#fff" id="yes">Borrar</button></div>`;
+    $("#no").onclick=()=>$("#cf").innerHTML=""; $("#yes").onclick=async()=>{ try{ const now=new Date().toISOString(); const u={borrado:true,borradoEn:now,borradoPor:(ME&&ME.name)||""}; if(ME&&ME.id) u.borradoPorId=ME.id; await COL.doc(c.id).update(u); logAct("movió a la papelera",c.cliente,c.id); close(); toast("Movido a la papelera") }catch(e){ toast("No se pudo borrar. Revisa la conexión.") } } };
+}
+
+/* ---------- mapa, cronómetro, visitas, fotos ---------- */
+const mapQ=c=> c.direccion? `${c.direccion}, ${c.zona!=="Sin pueblo"?c.zona+", ":""}Alicante` : `${c.cliente}, ${c.zona!=="Sin pueblo"?c.zona+", ":""}Alicante`;
+const hms=ms=>{ const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/3600)}:${pad2(Math.floor(s/60)%60)}:${pad2(s%60)}` };
+const dshort=iso=>{ const d=new Date(iso); return `${d.getDate()}/${d.getMonth()+1}/${String(d.getFullYear()).slice(2)}` };
+const hhmm=iso=>{ const d=new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}` };
+let PEND=null;
+function cronoBox(c){
+  const box=$("#cronobox"); if(!box) return;
+  if(PEND && PEND.clienteId===c.id){
+    let ops=2; const min=Math.max(1,Math.round((new Date(PEND.fin)-new Date(PEND.inicio))/60000));
+    const draw=()=>{ box.innerHTML=`<div class="crono"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="clock num">${hms(new Date(PEND.fin)-new Date(PEND.inicio))}</span><span class="hint">De ${hhmm(PEND.inicio)} a ${hhmm(PEND.fin)}</span></div>
+      <b>¿Quieres guardar este tiempo?</b>
+      <span class="hint" style="font-size:14px">Solo lo verás tú. Tus compañeros no lo ven.</span>
+      <div class="stepper"><button type="button" id="smn" aria-label="Menos">−</button><output class="num">${ops}</output><button type="button" id="spl" aria-label="Más">+</button><span class="hint" style="font-size:14px">personas trabajando</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="savev" type="button">Sí, guardar</button><button class="btn" id="nov" type="button">No</button></div></div>`;
+      $("#smn").onclick=()=>{ops=Math.max(1,ops-1);draw()}; $("#spl").onclick=()=>{ops=Math.min(9,ops+1);draw()};
+      $("#nov").onclick=()=>{ PEND=null; cronoBox(c); toast("No se ha guardado") };
+      $("#savev").onclick=async()=>{ if(!VIS){ toast("Para guardar necesitas conexión"); return }
+        const v={clienteId:c.id,cliente:c.cliente,inicio:PEND.inicio,fin:PEND.fin,min,ops};
+        try{ await VIS.add(v); PEND=null; cronoBox(c); toast(`Guardado: ${fmt(min)} × ${ops} (solo para ti)`); loadHist(c) }catch(e){ toast("No se pudo guardar. Revisa la conexión.") } };
+    }; draw(); return;
+  }
+  if(!CRONODOC){ box.innerHTML=`<div class="crono"><span class="hint">El cronómetro necesita conexión.</span></div>`; return }
+  if(CRONO && CRONO.clienteId===c.id){
+    box.innerHTML=`<div class="crono run"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap"><span class="clock num" data-clock>${hms(Date.now()-new Date(CRONO.inicio))}</span><span class="hint">Empezado a las ${hhmm(CRONO.inicio)}</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" id="stop" type="button">Terminar</button><button class="btn" id="cancelc" type="button">Descartar</button></div></div>`;
+    $("#stop").onclick=async()=>{ PEND={clienteId:c.id,cliente:c.cliente,inicio:CRONO.inicio,fin:new Date().toISOString()};
+      if(MIDIA.ids.includes(c.id)&&!MIDIA.hechos.includes(c.id)) saveDia({...MIDIA,hechos:[...MIDIA.hechos,c.id]});
+      cronoBox(c); try{ await CRONODOC.set({activo:false}) }catch(e){} };
+    $("#cancelc").onclick=async()=>{ if(!$("#cancelc").dataset.ok){ $("#cancelc").dataset.ok="1"; $("#cancelc").textContent="¿Descartar? Toca otra vez"; return }
+      try{ await CRONODOC.set({activo:false}) }catch(e){ toast("No se pudo parar") } };
+  } else if(CRONO){
+    box.innerHTML=`<div class="crono"><span>Tienes el cronómetro en marcha en <b>${esc(CRONO.cliente)}</b>. Termínalo antes de empezar aquí.</span><button class="btn" id="goc" type="button" style="justify-self:start">Ir a ${esc(CRONO.cliente)}</button></div>`;
+    $("#goc").onclick=()=>detail(CRONO.clienteId);
+  } else {
+    box.innerHTML=`<div class="crono"><span class="hint">Para medir lo que tardáis ahora. Al terminar decides si guardarlo; si lo guardas, solo lo verás tú.</span><button class="btn primary" id="startc" type="button" style="justify-self:start">▶ Empezar</button></div>`;
+    $("#startc").onclick=async()=>{ PEND=null; try{ await CRONODOC.set({activo:true,clienteId:c.id,cliente:c.cliente,inicio:new Date().toISOString()}) }catch(e){ toast("No se pudo empezar. Revisa la conexión.") } };
+  }
+}
+function cronoTick(){
+  const bar=$("#cronobar");
+  if(CRONO){ bar.hidden=false; bar.innerHTML=`<span>⏱ ${esc(CRONO.cliente)}</span><span class="num">${hms(Date.now()-new Date(CRONO.inicio))}</span>`;
+    document.querySelectorAll("[data-clock]").forEach(el=>el.textContent=hms(Date.now()-new Date(CRONO.inicio))) }
+  else bar.hidden=true;
+}
+setInterval(cronoTick,1000);
+const DIAS=["dom","lun","mar","mié","jue","vie","sáb"];
+function clockTick(){ const d=new Date(); $("#clock").innerHTML=`<small>${DIAS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}</small>${pad2(d.getHours())}:${pad2(d.getMinutes())}` }
+clockTick(); setInterval(clockTick,1000);
+$("#cronobar").onclick=()=>{ if(CRONO) detail(CRONO.clienteId) };
+async function loadHist(c){
+  const el=$("#hist"); if(!el) return;
+  if(!VIS){ el.innerHTML=`<div><span class="hint">Necesita conexión.</span></div>`; return }
+  try{ const s=await VIS.where("clienteId","==",c.id).get(); if(!document.getElementById("hist")) return;
+    const L=s.docs.map(d=>d.data()).sort((a,b)=>(b.inicio||"").localeCompare(a.inicio||""));
+    el.innerHTML= L.length? L.slice(0,8).map(v=>`<div><span>${dshort(v.inicio)} · ${hhmm(v.inicio)}</span><b class="num">${fmt(v.min)} × ${v.ops}</b></div>`).join("")
+      + (L.length>1?`<div><span class="hint">Media de ${L.length} veces</span><b class="num">${fmt(L.reduce((s,v)=>s+v.min,0)/L.length)}</b></div>`:"")
+      : `<div><span class="hint">No has guardado ningún tiempo aquí.</span></div>` }
+  catch(e){ el.innerHTML=`<div><span class="hint">No se pudieron cargar las visitas.</span></div>` }
+}
+async function loadFotos(c){
+  const el=$("#fotos"); if(!el) return;
+  if(!FOT){ el.innerHTML=`<span class="hint">Las fotos necesitan conexión.</span>`; return }
+  try{ const s=await FOT.where("clienteId","==",c.id).get(); if(!document.getElementById("fotos")) return;
+    const L=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.cuando||"").localeCompare(b.cuando||""));
+    el.innerHTML= L.length? L.map((f,i)=>`<button type="button" data-f="${i}" aria-label="Ver foto"><img src="${f.img}" alt="Foto de ${esc(c.cliente)}"></button>`).join("") : `<span class="hint">Sin fotos. Añade la fachada, dónde están las llaves o el agua.</span>`;
+    el.onclick=e=>{ const b=e.target.closest("[data-f]"); if(b) viewer(c,L[+b.dataset.f]) } }
+  catch(e){ el.innerHTML=`<span class="hint">No se pudieron cargar las fotos.</span>` }
+}
+function viewer(c,f){
+  const v=document.createElement("div"); v.className="viewer";
+  const mine=!!(ME&&(ME.isOwner||(f.porId&&f.porId===ME.id)));
+  v.innerHTML=`<div><img src="${f.img}" alt="Foto"><p>${f.por?esc(f.por)+" · ":""}${f.cuando?dshort(f.cuando)+" "+hhmm(f.cuando):""}</p><div class="vb"><button class="btn" id="vclose">Cerrar</button>${mine?'<button class="btn danger" id="vdel">Quitar foto</button>':""}</div></div>`;
+  document.body.append(v);
+  v.querySelector("#vclose").onclick=()=>v.remove();
+  v.onclick=e=>{ if(e.target===v) v.remove() };
+  const d=v.querySelector("#vdel"); if(d) d.onclick=async()=>{ if(!d.dataset.ok){ d.dataset.ok="1"; d.textContent="¿Seguro? Toca otra vez"; return }
+    try{ await FOT.doc(f.id).delete(); logAct("quitó una foto",c.cliente,c.id); v.remove(); toast("Foto quitada"); loadFotos(c) }catch(e){ toast("No se pudo quitar") } };
+}
+function shrink(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onerror=rej; r.onload=()=>{ const im=new Image(); im.onerror=rej; im.onload=()=>{
+  let max=1280, q=.72, out="";
+  for(let i=0;i<6;i++){ const k=Math.min(1,max/Math.max(im.width,im.height)); const cv=document.createElement("canvas"); cv.width=Math.round(im.width*k); cv.height=Math.round(im.height*k);
+    cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height); out=cv.toDataURL("image/jpeg",q); if(out.length<300000) break; max*=.8; q=Math.max(.5,q-.06) }
+  res(out) }; im.src=r.result }; r.readAsDataURL(file) }) }
+async function addFoto(c,file){
+  if(!FOT){ toast("Las fotos necesitan conexión"); return }
+  toast("Subiendo foto…");
+  try{ const img=await shrink(file); const d={clienteId:c.id,img,cuando:new Date().toISOString(),por:(ME&&ME.name)||""}; if(ME&&ME.id) d.porId=ME.id;
+    await FOT.add(d); logAct("añadió una foto",c.cliente,c.id); toast("Foto guardada"); loadFotos(c) }
+  catch(e){ toast("No se pudo guardar la foto") }
+}
+
+/* ---------- formulario ---------- */
+/* tipos de trabajo: base + los que añada el usuario (guardados en ajustes/tipos) */
+const BASE=["Cristales interior","Cristales exterior","Pértiga","Repisas","Marcos","Terrazas","Fachada","Letreros"];
+let EXTRA=[];
+const tiposAll=()=>[...BASE,...EXTRA.filter(x=>!BASE.includes(x))];
+function nombreDe(sel,det){
+  const parts=[]; const i=sel.includes("Cristales interior"), e=sel.includes("Cristales exterior");
+  if(i&&e) parts.push("Cristales Int-Ext"); else if(i) parts.push("Cristales Int"); else if(e) parts.push("Cristales Ext");
+  sel.filter(s=>s!=="Cristales interior"&&s!=="Cristales exterior").forEach(s=>parts.push(parts.length? s.toLowerCase(): s));
+  let n=parts.join(" + "); if(det) n= n? `${n} · ${det}` : det; return n;
+}
+function trow(t={}){
+  const isNewRow=!t.n;
+  return `<div class="trow"><div class="thead"><span>Trabajo</span><button type="button" class="x" aria-label="Quitar trabajo">×</button></div>
+  <div class="tipos">${tiposAll().map(x=>`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(x)}">${esc(x)}</button>`).join("")}<button type="button" class="tipo nuevo">+ Otro tipo</button></div>
+  <div class="newtipo" hidden><input class="in" placeholder="Ej: Persianas, Placas solares…" aria-label="Nuevo tipo de trabajo"><button type="button" class="btn primary">Añadir</button></div>
+  <div class="tprev"></div>
+  <div class="tfields"><label>Detalle (opcional)<input class="in td" value="${esc(isNewRow?"":t.n)}" placeholder="con pértiga, arriba…"></label>
+  <label>Tiempo<input class="in tm num" inputmode="text" value="${esc(t.texto? "": timeStr(t.min))}" placeholder="1h30"></label>
+  <label>× pers.<input class="in to num" inputmode="numeric" value="${t.min==null&&!t.texto?"2":(t.ops||"")}" placeholder="—"></label></div></div>` }
+function bindRow(r){
+  const prev=()=>{ const sel=[...r.querySelectorAll(".tipo[aria-pressed=true]")].map(b=>b.dataset.t); r.querySelector(".tprev").textContent=nombreDe(sel,r.querySelector(".td").value.trim()) };
+  r.querySelector(".x").onclick=()=>r.remove();
+  r.querySelector(".td").oninput=prev;
+  r.querySelector(".tipos").onclick=e=>{ const b=e.target.closest(".tipo"); if(!b) return;
+    if(b.classList.contains("nuevo")){ const n=r.querySelector(".newtipo"); n.hidden=!n.hidden; if(!n.hidden) n.querySelector("input").focus(); return }
+    b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")==="true"?"false":"true"); prev() };
+  const nt=r.querySelector(".newtipo");
+  const addTipo=async()=>{ const v=nt.querySelector("input").value.trim(); if(!v) return;
+    const nice=v.charAt(0).toUpperCase()+v.slice(1);
+    if(!tiposAll().some(x=>norm(x)===norm(nice))){ EXTRA=[...EXTRA,nice];
+      try{ await DB.doc("ajustes/tipos").set({lista:EXTRA}) }catch(e){ toast("No se pudo guardar el tipo nuevo") } }
+    document.querySelectorAll(".trow").forEach(row=>{ if(!row.querySelector(`.tipo[data-t="${CSS.escape(nice)}"]`)){
+      row.querySelector(".tipo.nuevo").insertAdjacentHTML("beforebegin",`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(nice)}">${esc(nice)}</button>`) } });
+    const b=r.querySelector(`.tipo[data-t="${CSS.escape(tiposAll().find(x=>norm(x)===norm(nice)))}"]`); if(b) b.setAttribute("aria-pressed","true");
+    nt.querySelector("input").value=""; nt.hidden=true; prev() };
+  nt.querySelector("button").onclick=addTipo;
+  nt.querySelector("input").onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); addTipo() } };
+  prev();
+}
+function form(c){
+  const isNew=!c; c=c||{zona:zona!=="Todos"?zona:"",barrio:"",cliente:"",tareas:[{}],nota:"",autor:"César"};
+  const zonas=[...new Set(ALL.map(x=>x.zona))].sort();
+  open(`<div class="sh-head"><div><h3>${isNew?"Nuevo tiempo":"Editar"}</h3><p>${isNew?"Casa, local o comunidad":esc(c.cliente)}</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
+  <form id="f">
+    <label>Cliente o casa<input class="in" id="f-cli" required value="${esc(c.cliente)}" placeholder="Casa Sr Fred, Mercadona Benissa…"></label>
+    <div class="two"><label>Pueblo<input class="in" id="f-zona" list="zl" value="${esc(c.zona)}" placeholder="Moraira"></label>
+      <label>Zona / calle<input class="in" id="f-barrio" value="${esc(c.barrio)}" placeholder="Opcional"></label></div>
+    <datalist id="zl">${zonas.map(z=>`<option value="${esc(z)}">`).join("")}</datalist>
+    <label>Dirección<input class="in" id="f-dir" value="${esc(c.direccion||"")}" placeholder="Calle Concentaina 5, Moraira" autocomplete="off"></label>
+    <div style="display:grid;gap:6px"><span style="font-size:14px;font-weight:600;color:var(--muted)">Avisos</span>
+      <div class="avsel" id="f-av">${AVISOS.map(a=>`<button type="button" class="tipo" data-a="${esc(a)}" aria-pressed="${(c.avisos||[]).includes(a)}">${esc(a)}</button>`).join("")}</div></div>
+    <div id="trows" style="display:grid;gap:8px">${(c.tareas.length?c.tareas:[{}]).map(trow).join("")}</div>
+    <span class="hint">Toca lo que se limpia. Tiempo por persona (45, 1h30, 2:15); deja «× pers.» vacío si es el tiempo total.</span>
+    <button type="button" class="btn" id="addt" style="justify-self:start">+ Otro trabajo</button>
+    <label>Nota<textarea class="in" id="f-nota" rows="3" placeholder="Dónde están las llaves, el agua, cosas a tener en cuenta…">${esc(c.nota)}</textarea></label>
+    <div class="two dt"><label>Anotado por<input class="in" id="f-autor" value="${esc(isNew?(ME&&ME.name)||"":c.autor)}" placeholder="Tu nombre" ${isNew&&ME&&ME.name?"readonly":""}></label>
+      <label>Fecha y hora<input class="in" id="f-cuando" type="datetime-local" value="${esc(c.cuando? localInput(new Date(c.cuando)) : c.fecha? c.fecha+"T00:00" : localInput(new Date()))}"></label></div>
+    <p id="err" class="hint" style="color:var(--danger)" hidden></p>
+    <div class="foot"><button type="button" class="btn" data-close>Cancelar</button><button class="btn primary" type="submit">Guardar</button></div>
+  </form>`);
+  document.querySelectorAll(".trow").forEach(bindRow);
+  $("#f-av").onclick=e=>{ const b=e.target.closest("[data-a]"); if(b) b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")==="true"?"false":"true") };
+  $("#addt").onclick=()=>{ $("#trows").insertAdjacentHTML("beforeend",trow({})); bindRow($("#trows").lastElementChild) };
+  const old=c;
+  $("#f").onsubmit=async e=>{ e.preventDefault();
+    const tareas=[]; let bad="";
+    document.querySelectorAll(".trow").forEach((r,i)=>{ const n=r.querySelector(".tprev").textContent.trim(), tm=r.querySelector(".tm").value.trim(), to=r.querySelector(".to").value.trim();
+      if(!n&&!tm) return; const m=parseTime(tm);
+      if(tm && Number.isNaN(m)){ bad=`No entiendo el tiempo «${tm}». Escribe 45, 1h30 o 2:15.`; return }
+      const prev=(old.tareas||[]).find(t=>t.n===n&&t.texto&&!tm);
+      const t={n:n||"General"}; if(m!=null) t.min=m; else if(prev) t.texto=prev.texto; else t.texto="Sin tiempo";
+      if(m!=null && +to>0) t.ops=+to; tareas.push(t) });
+    if(bad){ $("#err").textContent=bad; $("#err").hidden=false; return }
+    const d={cliente:$("#f-cli").value.trim(),zona:$("#f-zona").value.trim()||"Sin pueblo",barrio:$("#f-barrio").value.trim(),tareas,nota:$("#f-nota").value.trim(),autor:$("#f-autor").value.trim(),
+      direccion:$("#f-dir").value.trim(),avisos:[...document.querySelectorAll("#f-av [aria-pressed=true]")].map(b=>b.dataset.a)};
+    const cv=$("#f-cuando").value; const dt=cv? new Date(cv) : new Date();
+    d.cuando=dt.toISOString(); d.fecha=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
+    if(isNew){ if(ME&&ME.id) d.autorId=ME.id }
+    else { if(old.autorId) d.autorId=old.autorId; d.editado=new Date().toISOString(); if(ME){ d.editadoPor=ME.name||""; if(ME.id) d.editadoPorId=ME.id } }
+    try{ if(isNew){ const ref=await COL.add(d); logAct("añadió",d.cliente,ref&&ref.id) } else { await COL.doc(old.id).set(d); logAct("editó",d.cliente,old.id) } close(); toast("Guardado") }
+    catch(err){ $("#err").textContent="No se pudo guardar. Revisa la conexión y vuelve a intentarlo."; $("#err").hidden=false }
+  };
+}
+
+/* ---------- eventos ---------- */
+$("#chips").onclick=e=>{ const b=e.target.closest(".chip"); if(!b) return; zona=b.dataset.z; render(); window.scrollTo({top:0}) };
+$("#q").oninput=e=>{ q=e.target.value.trim(); render() };
+$("#sort").onchange=e=>{ sort=e.target.value; try{localStorage.setItem("ts-sort",sort)}catch(_){} render() };
+$("#out").onclick=e=>{ const r=e.target.closest(".row"); if(r) detail(r.dataset.id) };
+$("#layer").onclick=e=>{ if(e.target.closest("[data-close]")) close() };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") close() });
+function papelera(){
+  const own=true;
+  const items=TRASH.map(c=>{ const d=c.borradoEn? new Date(c.borradoEn):null;
+    const when=d? `${d.getDate()}/${d.getMonth()+1}/${String(d.getFullYear()).slice(2)} · ${pad(d.getHours())}:${pad(d.getMinutes())}`:"";
+    return `<div class="task" style="grid-template-columns:1fr auto"><span class="tn"><b>${esc(c.cliente)}</b><br><span class="hint">${esc(c.zona)} · borrado ${when}${c.borradoPor?" por "+esc(c.borradoPor):""}</span></span>
+      <span style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end"><button class="btn primary" data-rec="${esc(c.id)}">Recuperar</button>${own?`<button class="btn danger" data-kill="${esc(c.id)}">Borrar para siempre</button>`:""}</span></div>` }).join("");
+  open(`<div class="sh-head"><div><h3>Papelera</h3><p>Lo borrado se puede recuperar. Si lo borras para siempre, queda en el registro.</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
+    <div class="tasks" id="trashlist">${items||'<div class="task" style="grid-template-columns:1fr"><span class="hint">La papelera está vacía.</span></div>'}</div><div id="tcf"></div>`);
+  $("#trashlist").onclick=async e=>{
+    const r=e.target.closest("[data-rec]"), k=e.target.closest("[data-kill]");
+    if(r){ try{ const rc=TRASH.find(x=>x.id===r.dataset.rec); await COL.doc(r.dataset.rec).update({borrado:false,recuperadoEn:new Date().toISOString(),recuperadoPor:(ME&&ME.name)||""}); logAct("recuperó de la papelera",rc&&rc.cliente,r.dataset.rec); toast("Recuperado") }catch(err){ toast("No se pudo recuperar. Revisa la conexión.") } }
+    if(k){ const c=TRASH.find(x=>x.id===k.dataset.kill); if(!c) return;
+      $("#tcf").innerHTML=`<div class="confirm"><span style="flex:1">¿Borrar «${esc(c.cliente)}» para siempre? No se podrá recuperar.</span><button class="btn" id="tno">Cancelar</button><button class="btn primary" style="background:var(--danger);color:#fff" id="tyes">Borrar</button></div>`;
+      $("#tno").onclick=()=>$("#tcf").innerHTML="";
+      $("#tyes").onclick=async()=>{ try{ await COL.doc(c.id).delete(); logAct("borró para siempre",c.cliente,c.id,`${c.zona} · ${(c.tareas||[]).map(t=>t.n).join(", ")}`); $("#tcf").innerHTML=""; toast("Borrado para siempre") }catch(err){ toast("No se pudo borrar. Revisa la conexión.") } } }
+  };
+}
+$("#trash").onclick=papelera;
+/* ---------- personas, en línea y actividad ---------- */
+const isOn=u=> !!(u&&u.lastSeen&&(Date.now()-new Date(u.lastSeen))<150000);
+function agoStr(iso){ if(!iso) return "sin conexiones todavía"; const m=Math.max(1,Math.round((Date.now()-new Date(iso))/60000)); if(m<60) return `visto hace ${m} min`; const h=Math.round(m/60); if(h<24) return `visto hace ${h} h`; const d=new Date(iso); return `visto el ${d.getDate()}/${d.getMonth()+1}` }
+function updOnline(){ const n=Object.values(USERS).filter(u=>u.estado==="aprobado"&&isOn(u)).length; $("#onN").textContent=Math.max(1,n) }
+function sectT(t){ return `<div class="sect">${t}</div>` }
+function personas(){
+  const adm=!!(ME&&ME.isOwner);
+  const L=Object.entries(USERS).map(([id,u])=>({id,...u}));
+  const by=(a,b)=>(a.nombre||"").localeCompare(b.nombre||"","es");
+  const ap=L.filter(u=>u.estado==="aprobado").sort((a,b)=>(isOn(b)-isOn(a))||by(a,b));
+  const pe=L.filter(u=>u.estado==="pendiente").sort(by), no=L.filter(u=>u.estado==="rechazado"||u.estado==="quitado").sort(by);
+  const row=(u,btns)=>`<div class="prow"><span class="dot ${isOn(u)?"":"off"}"></span><span class="pn"><b>${esc(u.nombre||"Sin nombre")}${u.id===ME.id?" (tú)":""}${u.rol==="admin"?' <span class="tag">Admin</span>':""}</b><span>${isOn(u)?"En línea":agoStr(u.lastSeen)}${adm?" · "+esc(u.email||""):""}</span></span>${btns?`<span class="pb">${btns}</span>`:""}</div>`;
+  const n=ap.filter(isOn).length;
+  open(`<div class="sh-head"><div><h3>Personas</h3><p>${Math.max(1,n)} en línea · ${ap.length} con acceso</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
+    <div id="plist">
+    ${adm&&pe.length? sectT(`Pendientes de aprobar · ${pe.length}`)+`<div class="tasks">${pe.map(u=>row(u,`<button class="btn primary" data-ok="${u.id}">Aceptar</button><button class="btn danger" data-no="${u.id}">Rechazar</button>`)).join("")}</div>`:""}
+    ${sectT("Con acceso")}<div class="tasks">${ap.map(u=>row(u, adm&&u.id!==ME.id&&u.rol!=="admin"?`<button class="btn danger" data-quit="${u.id}">Quitar acceso</button>`:"")).join("")||'<div class="prow"><span class="hint">Nadie todavía</span></div>'}</div>
+    ${adm&&no.length? sectT("Sin acceso")+`<div class="tasks">${no.map(u=>row(u,`<button class="btn" data-ok="${u.id}">Dar acceso</button>`)).join("")}</div>`:""}
+    </div>
+    ${adm? sectT("Administración")+`<div class="tasks" style="padding:12px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="p-act">Ver actividad</button>${ALL.length+TRASH.length===0?`<label class="btn" style="cursor:pointer">Importar datos<input type="file" accept=".json,application/json" id="p-imp" hidden></label>`:""}</div>`:""}
+    <div class="foot"><span class="by">Has entrado como ${esc(ME.name)}${ME.email?" · "+esc(ME.email):""}</span><button class="btn" id="p-out">Cerrar sesión</button></div>
+    <div id="pcf"></div>`);
+  const setE=async(id,estado,accion)=>{ const u=USERS[id]; try{ await DB.doc("usuarios/"+id).update({estado,revisadoPor:ME.name,revisadoEn:new Date().toISOString()}); logAct(accion,u&&u.nombre,id); toast("Hecho") }catch(e){ toast("No se pudo cambiar. Revisa la conexión.") } };
+  $("#plist").onclick=e=>{ const ok=e.target.closest("[data-ok]"), no_=e.target.closest("[data-no]"), q_=e.target.closest("[data-quit]");
+    if(ok) setE(ok.dataset.ok,"aprobado","dio acceso a");
+    if(no_) setE(no_.dataset.no,"rechazado","rechazó a");
+    if(q_){ if(!q_.dataset.sure){ q_.dataset.sure="1"; q_.textContent="¿Seguro? Toca otra vez"; return } setE(q_.dataset.quit,"quitado","quitó el acceso a") } };
+  $("#p-out").onclick=async()=>{ close(); try{ await FB.logout() }catch(e){} };
+  if($("#p-act")) $("#p-act").onclick=actividad;
+  if($("#p-imp")) $("#p-imp").onchange=async e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return;
+    try{ const items=JSON.parse(await f.text()); if(!Array.isArray(items)||!items.length||!items[0].data) throw 0;
+      $("#pcf").innerHTML=`<p class="hint">Importando ${items.length} sitios…</p>`;
+      await FB.importar(items,k=>{ $("#pcf").innerHTML=`<p class="hint">Importados ${k} de ${items.length}…</p>` });
+      logAct("importó los datos",`${items.length} sitios`,""); $("#pcf").innerHTML=""; toast(`Importados ${items.length} sitios`); close() }
+    catch(err){ $("#pcf").innerHTML=`<p class="hint" style="color:var(--danger)">Ese archivo no es el de los datos. Usa el que te pasé.</p>` } };
+}
+$("#share").onclick=()=>{ if(ME) personas() };
+async function actividad(){
+  open(`<div class="sh-head"><div><h3>Actividad</h3><p>Quién ha hecho qué. Solo lo ves tú.</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
+    <div id="actf" style="margin-top:12px"></div><div class="tasks" id="actl"><div class="act"><span class="hint">Cargando…</span></div></div>`);
+  let L=[]; try{ L=await FB.actividad(400) }catch(e){ $("#actl").innerHTML=`<div class="act"><span class="hint">No se pudo cargar la actividad.</span></div>`; return }
+  const quien=[...new Set(L.map(a=>a.por).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es")); let sel="";
+  const draw=()=>{ const F=sel? L.filter(a=>a.por===sel):L;
+    $("#actl").innerHTML= F.length? F.map(a=>{ const d=new Date(a.cuando); return `<div class="act"><small class="num">${DIAS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}/${String(d.getFullYear()).slice(2)} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}</small><span><b>${esc(a.por||"Alguien")}</b> ${esc(a.accion)} ${a.cliente?`<b>«${esc(a.cliente)}»</b>`:""}</span>${a.detalle?`<span class="d">${esc(a.detalle)}</span>`:""}</div>` }).join("") : `<div class="act"><span class="hint">Todavía no hay actividad.</span></div>` };
+  $("#actf").innerHTML=`<div class="chips" style="padding:0 0 8px">${["",...quien].map(p=>`<button class="chip" data-p="${esc(p)}" aria-pressed="${p===sel}">${p?esc(p):"Todos"}</button>`).join("")}</div>`;
+  $("#actf").onclick=e=>{ const b=e.target.closest("[data-p]"); if(!b) return; sel=b.dataset.p; $("#actf").querySelectorAll("[data-p]").forEach(x=>x.setAttribute("aria-pressed",x.dataset.p===sel)); draw() };
+  draw();
+}
+$("#add").onclick=()=>{ if(!COL){ toast("Sin conexión con la base de datos"); return } form() };
+
+/* ---------- vistas ---------- */
+function setView(v){ VIEW=v; $("#tab-todos").setAttribute("aria-pressed",v==="todos"); $("#tab-dia").setAttribute("aria-pressed",v==="dia");
+  $("#sort").parentElement.hidden=v==="dia"; try{localStorage.setItem("ts-view",v)}catch(_){} render(); window.scrollTo({top:0}) }
+$("#tab-todos").onclick=()=>setView("todos");
+$("#tab-dia").onclick=()=>setView("dia");
+$("#out").addEventListener("click",e=>{ const h=e.target.closest("[data-h]"); if(!h) return; e.stopPropagation();
+  const id=h.dataset.h, on=MIDIA.hechos.includes(id); saveDia({...MIDIA,hechos: on? MIDIA.hechos.filter(x=>x!==id) : [...MIDIA.hechos,id]}) },true);
+
+/* ---------- acceso con cuenta ---------- */
+try{ if(localStorage.getItem("ts-view")==="dia") VIEW="dia" }catch(e){}
+let UNSUBS=[], MEUNSUB=null, STARTED=false, HB=null, AMODE="login";
+function showAuth(mode){ document.body.classList.add("auth-on"); close(); $("#auth").hidden=false; $("#auth-forms").hidden=mode!=="form"; $("#auth-wait").hidden=mode==="form";
+  if(mode==="rech"){ $("#w-title").textContent="Sin acceso"; $("#w-text").textContent="El administrador no te ha dado acceso a la app. Si crees que es un error, habla con él." }
+  else { $("#w-title").textContent="Esperando aprobación"; $("#w-text").textContent="Tu cuenta está creada. Cuando el administrador te acepte, entrarás directamente a la app. No hace falta que hagas nada más." } }
+function hideAuth(){ document.body.classList.remove("auth-on"); $("#auth").hidden=true }
+function setAMode(m){ AMODE=m; $("#a-login").setAttribute("aria-pressed",m==="login"); $("#a-reg").setAttribute("aria-pressed",m==="reg");
+  $("#a-nombre-l").hidden=m!=="reg"; $("#a-go").textContent= m==="reg"?"Crear cuenta":"Entrar"; $("#a-pass").autocomplete= m==="reg"?"new-password":"current-password"; $("#aerr").hidden=true }
+$("#a-login").onclick=()=>setAMode("login"); $("#a-reg").onclick=()=>setAMode("reg");
+const AERR={"auth/invalid-email":"Ese correo no es válido.","auth/missing-password":"Escribe la contraseña.","auth/weak-password":"La contraseña necesita al menos 6 caracteres.","auth/email-already-in-use":"Ya hay una cuenta con ese correo. Pulsa «Entrar».","auth/invalid-credential":"Correo o contraseña incorrectos.","auth/wrong-password":"Correo o contraseña incorrectos.","auth/user-not-found":"No hay ninguna cuenta con ese correo. Pulsa «Registrarme».","auth/too-many-requests":"Demasiados intentos. Espera unos minutos.","auth/network-request-failed":"Sin conexión. Revisa internet."};
+const aerr=t=>{ $("#aerr").textContent=t; $("#aerr").hidden=false };
+$("#af").onsubmit=async e=>{ e.preventDefault(); const em=$("#a-email").value.trim(), pw=$("#a-pass").value, nm=$("#a-nombre").value.trim();
+  if(AMODE==="reg"&&!nm) return aerr("Escribe tu nombre.");
+  $("#a-go").disabled=true;
+  try{ if(AMODE==="reg") await FB.register(nm,em,pw); else await FB.login(em,pw) }
+  catch(err){ aerr(AERR[err.code]||"No se pudo entrar. Inténtalo otra vez.") }
+  $("#a-go").disabled=false };
+$("#a-reset").onclick=async()=>{ const em=$("#a-email").value.trim(); if(!em) return aerr("Escribe tu correo arriba y vuelve a pulsar.");
+  try{ await FB.reset(em); aerr("Te hemos enviado un correo para cambiar la contraseña. Mira también en spam.") }catch(err){ aerr(AERR[err.code]||"No se pudo enviar el correo.") } };
+$("#w-out").onclick=()=>FB.logout();
+
+function stopData(){ UNSUBS.forEach(f=>{ try{f()}catch(e){} }); UNSUBS=[]; STARTED=false; clearInterval(HB);
+  ALL=[]; TRASH=[]; USERS={}; CRONO=null; PEND=null; MIDIA={fecha:"",ids:[],hechos:[],ops:{}}; COL=VIS=FOT=DIADOC=CRONODOC=null }
+function beat(){ if(ME&&document.visibilityState==="visible") DB.doc("usuarios/"+ME.id).update({lastSeen:new Date().toISOString()}).catch(()=>{}) }
+document.addEventListener("visibilitychange",beat);
+function startData(){
+  if(STARTED) return; STARTED=true;
+  COL=DB.collection("clientes"); FOT=DB.collection("fotos");
+  const P=DB.collection("data/users/"+ME.id); DIADOC=P.doc("midia"); CRONODOC=P.doc("crono"); VIS=DB.collection("data/users/"+ME.id+"/registro/visitas");
+  setView(VIEW);
+  UNSUBS.push(DIADOC.onSnapshot(s=>{ if(s.exists){ const m=s.data(); MIDIA={fecha:m.fecha||"",ids:m.ids||[],hechos:m.hechos||[],ops:m.ops||{}} } render() },()=>{}));
+  UNSUBS.push(CRONODOC.onSnapshot(s=>{ const d=s.exists?s.data():null; CRONO= d&&d.activo? d : null; cronoTick(); if(CUR&&$("#cronobox")){ const c=ALL.find(x=>x.id===CUR); if(c) cronoBox(c) } },()=>{}));
+  UNSUBS.push(DB.doc("ajustes/tipos").onSnapshot(s=>{ EXTRA=(s.exists && s.data().lista)||[] },()=>{}));
+  UNSUBS.push(DB.collection("usuarios").limit(500).onSnapshot(s=>{ USERS={}; s.docs.forEach(d=>USERS[d.id]=d.data()); updOnline(); if(document.getElementById("plist")) personas() },()=>{}));
+  UNSUBS.push(COL.limit(5000).onSnapshot(s=>{ ONLINE=true; const docs=s.docs.map(d=>({id:d.id,...d.data()})); ALL=docs.filter(c=>!c.borrado); TRASH=docs.filter(c=>c.borrado).sort((a,b)=>(b.borradoEn||"").localeCompare(a.borradoEn||""));
+      $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`; if(document.getElementById("trashlist")) papelera(); $("#status").textContent= navigator.onLine?"Sincronizado":"Sin conexión"; render() },
+    err=>{ $("#status").textContent="Sin conexión"; if(!ALL.length) toast("No se pudieron cargar los datos") }));
+  beat(); HB=setInterval(()=>{ beat(); updOnline() },60000);
+}
+addEventListener("online",()=>{ if(STARTED) $("#status").textContent="Sincronizado" });
+addEventListener("offline",()=>{ if(STARTED) $("#status").textContent="Sin conexión · se guardará al volver" });
+
+window.boot=function(){
+  DB=FB.db; setAMode("login");
+  FB.onAuth(async user=>{
+    if(MEUNSUB){ try{MEUNSUB()}catch(e){} MEUNSUB=null }
+    stopData(); ME=null; render();
+    if(!user){ showAuth("form"); return }
+    const ref=DB.doc("usuarios/"+user.uid);
+    try{ const s=await ref.get(); if(!s.exists){ const base={nombre:user.displayName||$("#a-nombre").value.trim()||user.email.split("@")[0],email:user.email,creado:new Date().toISOString()};
+      // solo el correo de administrador (definido en las reglas de Firebase) puede crearse como admin
+      try{ await ref.set({...base,estado:"aprobado",rol:"admin"}) }catch(e){ await ref.set({...base,estado:"pendiente",rol:"miembro"}) } } }catch(e){}
+    MEUNSUB=ref.onSnapshot(s=>{ const u=s.exists?s.data():null; if(!u){ showAuth("wait"); return }
+      const admin=u.rol==="admin";
+      if(u.estado==="aprobado"||admin){ ME={id:user.uid,name:u.nombre||user.displayName||"",email:user.email,isOwner:admin}; $("#me").textContent=ME.name; hideAuth(); startData() }
+      else { stopData(); ME=null; showAuth(u.estado==="pendiente"?"wait":"rech") } },()=>showAuth("wait"));
+  });
+};
+</script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, query, where, limit, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ===== CONFIGURACIÓN (la de tu proyecto de Firebase) =====
+const firebaseConfig = {
+  apiKey: "AIzaSyAlmb23BX9XBSxkIavd232hvUpVb6_9Av8",
+  authDomain: "tiempos-selima.firebaseapp.com",
+  projectId: "tiempos-selima",
+  storageBucket: "tiempos-selima.firebasestorage.app",
+  messagingSenderId: "905718764392",
+  appId: "1:905718764392:web:19bc999a2371813464bcdd"
+};
+// ========================================================
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app); auth.languageCode = "es";
+let fs;
+try { fs = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
+catch (e) { fs = initializeFirestore(app, {}); }
+
+const snap = s => ({ id: s.id, exists: s.exists(), data: () => s.data() });
+const wDoc = ref => ({
+  get: async () => snap(await getDoc(ref)),
+  set: d => setDoc(ref, d), update: d => updateDoc(ref, d), delete: () => deleteDoc(ref),
+  onSnapshot: (f, e) => onSnapshot(ref, s => f(snap(s)), e)
+});
+const wCol = ref => ({
+  doc: id => wDoc(doc(ref, id)),
+  add: d => addDoc(ref, d),
+  where: (a, op, b) => ({ get: async () => ({ docs: (await getDocs(query(ref, where(a, op, b)))).docs.map(snap) }) }),
+  limit: n => ({ onSnapshot: (f, e) => onSnapshot(query(ref, limit(n)), s => f({ docs: s.docs.map(snap) }), e) })
+});
+
+window.FB = {
+  db: { collection: p => wCol(collection(fs, p)), doc: p => wDoc(doc(fs, p)) },
+  onAuth: cb => onAuthStateChanged(auth, cb),
+  login: (e, p) => signInWithEmailAndPassword(auth, e, p),
+  register: async (n, e, p) => { const c = await createUserWithEmailAndPassword(auth, e, p); await updateProfile(c.user, { displayName: n }); return c.user; },
+  logout: () => signOut(auth),
+  reset: e => sendPasswordResetEmail(auth, e),
+  actividad: async n => (await getDocs(query(collection(fs, "actividad"), orderBy("cuando", "desc"), limit(n)))).docs.map(d => ({ id: d.id, ...d.data() })),
+  importar: async (items, progress) => {
+    for (let i = 0; i < items.length; i += 400) {
+      const b = writeBatch(fs);
+      items.slice(i, i + 400).forEach(x => b.set(doc(fs, "clientes", x.id), x.data));
+      await b.commit(); progress && progress(Math.min(items.length, i + 400));
+    }
+  }
+};
+window.boot && window.boot();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+</script>
+</body>
+</html>
