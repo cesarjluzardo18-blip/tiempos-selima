@@ -207,6 +207,18 @@ body.auth-on>header,body.auth-on>main,body.auth-on>.fab{display:none!important}
 .act:first-child{border-top:0}
 .act small{color:var(--muted);font-size:13px}
 .act .d{font-size:13px;color:var(--muted)}
+/* ordenador: usar todo el ancho */
+@media (min-width:1000px){
+  .wrap{max-width:1360px}
+  header .tabs{max-width:460px}
+  .search{max-width:640px}
+  #out>.list,.group .list{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;background:transparent;border:0;border-radius:0;overflow:visible}
+  #out>.list>.row,.group .list>.row,#out>.list>.dayrow{border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+  #out>.list>.row:first-child,.group .list>.row:first-child,#out>.list>.dayrow:first-child{border-top:1px solid var(--line)}
+  .group h2{margin-top:26px}
+  .fab{right:calc(32px + env(safe-area-inset-right,0px));bottom:calc(28px + env(safe-area-inset-bottom,0px))}
+}
+@media (min-width:1600px){ .wrap{max-width:1560px} }
 </style>
 
 <header>
