@@ -636,6 +636,7 @@ function personas(){
     ${adm&&no.length? sectT("Sin acceso")+`<div class="tasks">${no.map(u=>row(u,`<button class="btn" data-ok="${u.id}">Dar acceso</button>`)).join("")}</div>`:""}
     </div>
     ${adm? sectT("Administración")+`<div class="tasks" style="padding:12px 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="p-act">Ver actividad</button>${ALL.length+TRASH.length===0?`<label class="btn" style="cursor:pointer">Importar datos<input type="file" accept=".json,application/json" id="p-imp" hidden></label>`:""}</div>`:""}
+    ${sectT("Notificaciones")}<div class="tasks" id="pushbox" style="padding:12px 14px;display:grid;gap:10px"><span class="hint">Comprobando…</span></div>
     <div class="foot"><span class="by">Has entrado como ${esc(ME.name)}${ME.email?" · "+esc(ME.email):""}</span><button class="btn" id="p-out">Cerrar sesión</button></div>
     <div id="pcf"></div>`);
   const setE=async(id,estado,accion)=>{ const u=USERS[id]; try{ await DB.doc("usuarios/"+id).update({estado,revisadoPor:ME.name,revisadoEn:new Date().toISOString()}); logAct(accion,u&&u.nombre,id); toast("Hecho") }catch(e){ toast("No se pudo cambiar. Revisa la conexión.") } };
@@ -643,6 +644,7 @@ function personas(){
     if(ok) setE(ok.dataset.ok,"aprobado","dio acceso a");
     if(no_) setE(no_.dataset.no,"rechazado","rechazó a");
     if(q_){ if(!q_.dataset.sure){ q_.dataset.sure="1"; q_.textContent="¿Seguro? Toca otra vez"; return } setE(q_.dataset.quit,"quitado","quitó el acceso a") } };
+  pushBox();
   $("#p-out").onclick=async()=>{ close(); try{ await FB.logout() }catch(e){} };
   if($("#p-act")) $("#p-act").onclick=actividad;
   if($("#p-imp")) $("#p-imp").onchange=async e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return;
@@ -651,6 +653,27 @@ function personas(){
       await FB.importar(items,k=>{ $("#pcf").innerHTML=`<p class="hint">Importados ${k} de ${items.length}…</p>` });
       logAct("importó los datos",`${items.length} sitios`,""); $("#pcf").innerHTML=""; toast(`Importados ${items.length} sitios`); close() }
     catch(err){ $("#pcf").innerHTML=`<p class="hint" style="color:var(--danger)">Ese archivo no es el de los datos. Usa el que te pasé.</p>` } };
+}
+
+/* ---------- notificaciones ---------- */
+const isIOS=/iPhone|iPad|iPod/.test(navigator.userAgent);
+const isStandalone=()=> !!(navigator.standalone||matchMedia("(display-mode: standalone)").matches);
+async function savePushToken(t){ if(!t||!ME) return; const ref=DB.doc(`data/users/${ME.id}/push`);
+  let tokens=[]; try{ const s=await ref.get(); tokens=(s.exists&&s.data().tokens)||[] }catch(e){}
+  if(!tokens.includes(t)) tokens=[...tokens,t].slice(-5);
+  await ref.set({tokens,actualizado:new Date().toISOString()}) }
+async function pushRefresh(){ try{ if(FB.push.permission()==="granted"){ const t=await FB.push.token(false); await savePushToken(t) } }catch(e){} }
+async function pushBox(){
+  const el=document.getElementById("pushbox"); if(!el) return;
+  const sup=await FB.push.supported(), perm=FB.push.permission();
+  if(isIOS&&!isStandalone()){ el.innerHTML=`<span class="hint" style="font-size:14px">En iPhone, primero añade la app a la pantalla de inicio: en Safari pulsa <b>Compartir</b> → <b>Añadir a pantalla de inicio</b>. Ábrela desde ese icono y vuelve aquí para activar los avisos.</span>`; return }
+  if(!sup){ el.innerHTML=`<span class="hint" style="font-size:14px">Este navegador no permite notificaciones. Prueba con Chrome, o en iPhone con la app añadida a la pantalla de inicio.</span>`; return }
+  if(perm==="denied"){ el.innerHTML=`<span class="hint" style="font-size:14px">Las notificaciones están bloqueadas en este dispositivo. Actívalas en los ajustes del navegador o del móvil para esta app.</span>`; return }
+  if(perm==="granted"){ el.innerHTML=`<span style="display:flex;align-items:center;gap:8px"><span class="dot"></span>Avisos activados en este dispositivo.</span>`; pushRefresh(); return }
+  el.innerHTML=`<span class="hint" style="font-size:14px">Recibe un aviso cuando alguien añada, corrija o borre algo. Los avisos tardan unos minutos en llegar.</span><button class="btn primary" id="pushon" style="justify-self:start">Activar notificaciones</button>`;
+  $("#pushon").onclick=async()=>{ $("#pushon").disabled=true; $("#pushon").textContent="Activando…";
+    try{ const t=await FB.push.token(true); await savePushToken(t); toast("Notificaciones activadas"); pushBox() }
+    catch(e){ toast(e.message==="denied"?"No has dado permiso para las notificaciones":"No se pudieron activar. Inténtalo otra vez."); pushBox() } };
 }
 $("#share").onclick=()=>{ if(ME) personas() };
 async function actividad(){
@@ -713,6 +736,7 @@ function startData(){
       $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`; if(document.getElementById("trashlist")) papelera(); $("#status").textContent= navigator.onLine?"Sincronizado":"Sin conexión"; render() },
     err=>{ $("#status").textContent="Sin conexión"; if(!ALL.length) toast("No se pudieron cargar los datos") }));
   beat(); HB=setInterval(()=>{ beat(); updOnline() },60000);
+  pushRefresh();
 }
 addEventListener("online",()=>{ if(STARTED) $("#status").textContent="Sincronizado" });
 addEventListener("offline",()=>{ if(STARTED) $("#status").textContent="Sin conexión · se guardará al volver" });
@@ -738,9 +762,11 @@ window.boot=function(){
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getMessaging, getToken, isSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, query, where, limit, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // ===== CONFIGURACIÓN (la de tu proyecto de Firebase) =====
+const VAPID_KEY = "BDZlWzk4t6sfXIPCU6x3c6rhg3GKtfh6_NHFYpMlTViHNK3NDwKlo7l_WbHG9LBDC3f5DzPMwbCTHSN57yEm9lE";
 const firebaseConfig = {
   apiKey: "AIzaSyAlmb23BX9XBSxkIavd232hvUpVb6_9Av8",
   authDomain: "tiempos-selima.firebaseapp.com",
@@ -778,6 +804,17 @@ window.FB = {
   logout: () => signOut(auth),
   reset: e => sendPasswordResetEmail(auth, e),
   actividad: async n => (await getDocs(query(collection(fs, "actividad"), orderBy("cuando", "desc"), limit(n)))).docs.map(d => ({ id: d.id, ...d.data() })),
+  push: {
+    supported: async () => { try { return ("Notification" in window) && ("serviceWorker" in navigator) && await isSupported(); } catch (e) { return false; } },
+    permission: () => ("Notification" in window) ? Notification.permission : "unsupported",
+    token: async (ask) => {
+      if (ask) { const p = await Notification.requestPermission(); if (p !== "granted") throw new Error("denied"); }
+      else if (Notification.permission !== "granted") return null;
+      const reg = await navigator.serviceWorker.register("sw.js");
+      await navigator.serviceWorker.ready;
+      return await getToken(getMessaging(app), { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    }
+  },
   importar: async (items, progress) => {
     for (let i = 0; i < items.length; i += 400) {
       const b = writeBatch(fs);
