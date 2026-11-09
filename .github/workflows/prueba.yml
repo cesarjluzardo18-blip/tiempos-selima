@@ -1,0 +1,19 @@
+name: Aviso de prueba
+on:
+  push:
+    paths: ["avisos/prueba.txt"]
+  workflow_dispatch:
+jobs:
+  prueba:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - working-directory: avisos
+        run: npm install --no-save --no-audit --no-fund firebase-admin@12.7.0
+      - run: node avisos/prueba.js
+        env:
+          FIREBASE_SA: ${{ secrets.FIREBASE_SA }}
