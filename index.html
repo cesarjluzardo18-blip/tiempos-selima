@@ -242,7 +242,7 @@ body.auth-on>header,body.auth-on>main,body.auth-on>.fab{display:none!important}
 <main>
   <div class="wrap">
     <button class="cronobar" id="cronobar" hidden></button>
-    <div class="meta"><span style="display:flex;gap:10px;align-items:center"><span id="count" class="num"></span><button class="btn ghost" id="trash" style="padding:4px 10px;font-size:13px" hidden></button><span id="status" class="status">Cargando…</span></span>
+    <div class="meta"><span style="display:flex;gap:10px;align-items:center"><span id="count" class="num"></span><button class="btn ghost" id="nov" style="padding:4px 10px;font-size:13px">Novedades</button><button class="btn ghost" id="trash" style="padding:4px 10px;font-size:13px" hidden></button><span id="status" class="status">Cargando…</span></span>
       <label style="display:flex;gap:6px;align-items:center;font-weight:500">Orden
         <select id="sort"><option value="pueblo">Por pueblo</option><option value="az">A–Z</option><option value="reciente">Recientes</option></select>
       </label>
@@ -302,7 +302,8 @@ function parseTime(s){ s=(s||"").toLowerCase().replace(/\s/g,"").replace(",","."
   m=s.match(/^(\d+(?:\.\d+)?)h$/); if(m) return Math.round(+m[1]*60);
   m=s.match(/^(\d+)(?:m|min)?$/); if(m) return +m[1]; return NaN; }
 const timeStr=m=>{ if(m==null) return ""; const h=Math.floor(m/60), r=m%60; return h? `${h}h${r?String(r).padStart(2,"0"):""}`:`${r}`; };
-function logAct(accion,cliente,clienteId,extra){ if(!ME||!window.FB) return; const a={accion,cliente:cliente||"",clienteId:clienteId||"",por:ME.name||"",porId:ME.id,cuando:new Date().toISOString()}; if(extra) a.detalle=extra; FB.db.collection("actividad").add(a).catch(()=>{}) }
+function logAct(accion,cliente,clienteId,extra){ if(!ME||!window.FB) return; const a={accion,cliente:cliente||"",clienteId:clienteId||"",por:ME.name||"",porId:ME.id,cuando:new Date().toISOString()}; if(extra) a.detalle=extra; FB.db.collection("actividad").add(a).catch(()=>{}); if(CASA_ACC.has(accion)) FB.db.collection("novedades").add(a).catch(()=>{}) }
+const CASA_ACC=new Set(["añadió","editó","movió a la papelera","recuperó de la papelera","borró para siempre","añadió una foto","quitó una foto"]);
 function toast(t){ const el=document.createElement("div"); el.className="toast"; el.textContent=t; document.body.append(el); setTimeout(()=>el.remove(),2200) }
 
 function chips(){
@@ -652,7 +653,7 @@ function personas(){
     if(q_){ if(!q_.dataset.sure){ q_.dataset.sure="1"; q_.textContent="¿Seguro? Toca otra vez"; return } setE(q_.dataset.quit,"quitado","quitó el acceso a") } };
   pushBox();
   $("#p-out").onclick=async()=>{ close(); try{ await FB.logout() }catch(e){} };
-  if($("#p-act")) $("#p-act").onclick=actividad;
+  if($("#p-act")) $("#p-act").onclick=()=>actividad();
   if($("#p-imp")) $("#p-imp").onchange=async e=>{ const f=e.target.files&&e.target.files[0]; if(!f) return;
     try{ const items=JSON.parse(await f.text()); if(!Array.isArray(items)||!items.length||!items[0].data) throw 0;
       $("#pcf").innerHTML=`<p class="hint">Importando ${items.length} sitios…</p>`;
@@ -682,10 +683,11 @@ async function pushBox(){
     catch(e){ toast(e.message==="denied"?"No has dado permiso para las notificaciones":"No se pudieron activar. Inténtalo otra vez."); pushBox() } };
 }
 $("#share").onclick=()=>{ if(ME) personas() };
-async function actividad(){
-  open(`<div class="sh-head"><div><h3>Actividad</h3><p>Quién ha hecho qué. Solo lo ves tú.</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
+$("#nov").onclick=()=>{ if(ME) actividad("nov") };
+async function actividad(kind){ kind=kind==="nov"?"nov":"act";
+  open(`<div class="sh-head"><div><h3>${kind==="nov"?"Novedades":"Actividad"}</h3><p>${kind==="nov"?"Lo que se ha añadido, corregido o borrado.":"Quién ha hecho qué. Solo lo ves tú."}</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
     <div id="actf" style="margin-top:12px"></div><div class="tasks" id="actl"><div class="act"><span class="hint">Cargando…</span></div></div>`);
-  let L=[]; try{ L=await FB.actividad(400) }catch(e){ $("#actl").innerHTML=`<div class="act"><span class="hint">No se pudo cargar la actividad.</span></div>`; return }
+  let L=[]; try{ L= kind==="nov"? await FB.novedades(300) : await FB.actividad(400) }catch(e){ $("#actl").innerHTML=`<div class="act"><span class="hint">No se pudo cargar la actividad.</span></div>`; return }
   const quien=[...new Set(L.map(a=>a.por).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"es")); let sel="";
   const draw=()=>{ const F=sel? L.filter(a=>a.por===sel):L;
     $("#actl").innerHTML= F.length? F.map(a=>{ const d=new Date(a.cuando); return `<div class="act"><small class="num">${DIAS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}/${String(d.getFullYear()).slice(2)} · ${pad2(d.getHours())}:${pad2(d.getMinutes())}</small><span><b>${esc(a.por||"Alguien")}</b> ${esc(a.accion)} ${a.cliente?`<b>«${esc(a.cliente)}»</b>`:""}</span>${a.detalle?`<span class="d">${esc(a.detalle)}</span>`:""}</div>` }).join("") : `<div class="act"><span class="hint">Todavía no hay actividad.</span></div>` };
@@ -835,6 +837,7 @@ window.FB = {
       return await getToken(getMessaging(app), { vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
     }
   },
+  novedades: async n => (await getDocs(query(collection(fs, "novedades"), orderBy("cuando", "desc"), limit(n)))).docs.map(d => ({ id: d.id, ...d.data() })),
   importar: async (items, progress) => {
     for (let i = 0; i < items.length; i += 400) {
       const b = writeBatch(fs);

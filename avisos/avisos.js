@@ -36,7 +36,7 @@ async function main() {
     const quien = a.por || "Alguien", que = a.cliente ? `«${a.cliente}»` : "";
     const otros = l => l.filter(u => u !== a.porId);
     if (a.accion === "añadió" || a.accion === "editó") avisar(otros(aprobados), `${quien} ${a.accion} ${que}`);
-    else if (a.accion === "movió a la papelera" || a.accion === "borró para siempre") avisar(otros(admins), `${quien} ${a.accion} ${que}`, "Algo se ha borrado");
+    else if (a.accion === "movió a la papelera" || a.accion === "borró para siempre") avisar(otros(aprobados), `${quien} ${a.accion} ${que}`, "Algo se ha borrado");
     else if (a.accion === "dio acceso a" && a.clienteId) avisar([a.clienteId], "Ya tienes acceso. Abre la app para entrar.", "¡Bienvenido a Tiempos Selima!");
   });
 
