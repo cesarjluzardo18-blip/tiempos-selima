@@ -510,7 +510,8 @@ async function addFoto(c,file){
 /* tipos de trabajo: base + los que añada el usuario (guardados en ajustes/tipos) */
 const BASE=["Cristales interior","Cristales exterior","Pértiga","Repisas","Marcos","Terrazas","Fachada","Letreros","Abrillantar"];
 let EXTRA=[];
-const tiposAll=()=>[...BASE,...EXTRA.filter(x=>!BASE.includes(x))];
+let LOCALT=[]; // tipos escritos a mano: solo para la casa que se está editando, no se guardan como botón
+const tiposAll=()=>[...BASE,...LOCALT.filter(x=>!BASE.includes(x))];
 function nombreDe(sel,det){
   const parts=[]; const i=sel.includes("Cristales interior"), e=sel.includes("Cristales exterior");
   if(i&&e) parts.push("Cristales Int-Ext"); else if(i) parts.push("Cristales Int"); else if(e) parts.push("Cristales Ext");
@@ -520,8 +521,8 @@ function nombreDe(sel,det){
 function trow(t={}){
   const isNewRow=!t.n;
   return `<div class="trow"><div class="thead"><span>Trabajo</span><button type="button" class="x" aria-label="Quitar trabajo">×</button></div>
-  <div class="tipos">${tiposAll().map(x=>`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(x)}">${esc(x)}</button>`).join("")}<button type="button" class="tipo nuevo">+ Otro tipo</button></div>
-  <div class="newtipo" hidden><input class="in" placeholder="Ej: Persianas, Placas solares…" aria-label="Nuevo tipo de trabajo"><button type="button" class="btn primary">Añadir</button></div>
+  <div class="tipos">${tiposAll().map(x=>`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(x)}">${esc(x)}</button>`).join("")}<button type="button" class="tipo nuevo">+ Otro (solo esta casa)</button></div>
+  <div class="newtipo" hidden><input class="in" placeholder="Solo para esta casa: persianas, placas solares…" aria-label="Otro trabajo para esta casa"><button type="button" class="btn primary">Añadir</button></div>
   <div class="tprev"></div>
   <div class="tfields"><label>Detalle (opcional)<input class="in td" value="${esc(isNewRow?"":t.n)}" placeholder="con pértiga, arriba…"></label>
   <label>Tiempo<input class="in tm num" inputmode="text" value="${esc(t.texto? "": timeStr(t.min))}" placeholder="1h30"></label>
@@ -536,10 +537,8 @@ function bindRow(r){
   const nt=r.querySelector(".newtipo");
   const addTipo=async()=>{ const v=nt.querySelector("input").value.trim(); if(!v) return;
     const nice=v.charAt(0).toUpperCase()+v.slice(1);
-    if(!tiposAll().some(x=>norm(x)===norm(nice))){ EXTRA=[...EXTRA,nice];
-      try{ await DB.doc("ajustes/tipos").set({lista:EXTRA}) }catch(e){ toast("No se pudo guardar el tipo nuevo") } }
-    document.querySelectorAll(".trow").forEach(row=>{ if(!row.querySelector(`.tipo[data-t="${CSS.escape(nice)}"]`)){
-      row.querySelector(".tipo.nuevo").insertAdjacentHTML("beforebegin",`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(nice)}">${esc(nice)}</button>`) } });
+    if(!tiposAll().some(x=>norm(x)===norm(nice))) LOCALT=[...LOCALT,nice];
+    if(!r.querySelector(`.tipo[data-t="${CSS.escape(nice)}"]`)) r.querySelector(".tipo.nuevo").insertAdjacentHTML("beforebegin",`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(nice)}">${esc(nice)}</button>`);
     const b=r.querySelector(`.tipo[data-t="${CSS.escape(tiposAll().find(x=>norm(x)===norm(nice)))}"]`); if(b) b.setAttribute("aria-pressed","true");
     nt.querySelector("input").value=""; nt.hidden=true; prev() };
   nt.querySelector("button").onclick=addTipo;
@@ -547,6 +546,7 @@ function bindRow(r){
   prev();
 }
 function form(c){
+  LOCALT=[];
   const isNew=!c; c=c||{zona:zona!=="Todos"?zona:"",barrio:"",cliente:"",tareas:[{}],nota:"",autor:"César"};
   const zonas=[...new Set(ALL.map(x=>x.zona))].sort();
   open(`<div class="sh-head"><div><h3>${isNew?"Nuevo tiempo":"Editar"}</h3><p>${isNew?"Casa, local o comunidad":esc(c.cliente)}</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
