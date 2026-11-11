@@ -725,6 +725,16 @@ $("#a-reset").onclick=async()=>{ const em=$("#a-email").value.trim(); if(!em) re
   try{ await FB.reset(em); aerr("Te hemos enviado un correo para cambiar la contraseña. Mira también en spam.") }catch(err){ aerr(AERR[err.code]||"No se pudo enviar el correo.") } };
 $("#w-out").onclick=()=>FB.logout();
 
+/* copia rápida en el móvil para abrir al instante */
+const SNAPK="ts-snap";
+let SNAPT=null;
+function snapSave(docs){ clearTimeout(SNAPT); SNAPT=setTimeout(()=>{ try{ if(ME) localStorage.setItem(SNAPK,JSON.stringify({me:ME,docs,midia:MIDIA,t:Date.now()})) }catch(e){} },800) }
+function snapClear(){ try{ localStorage.removeItem(SNAPK) }catch(e){} }
+function snapLoad(){ try{ const c=JSON.parse(localStorage.getItem(SNAPK)||"null"); if(!c||!c.me||!c.docs) return false;
+  ME=c.me; $("#me").textContent=ME.name||""; if(c.midia&&c.midia.ids) MIDIA={ops:{},...c.midia};
+  ALL=c.docs.filter(x=>!x.borrado); TRASH=c.docs.filter(x=>x.borrado);
+  $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`;
+  hideAuth(); updOnline(); setView(VIEW); $("#status").textContent="Actualizando…"; return true }catch(e){ return false } }
 function stopData(){ UNSUBS.forEach(f=>{ try{f()}catch(e){} }); UNSUBS=[]; STARTED=false; clearInterval(HB);
   ALL=[]; TRASH=[]; USERS={}; $("#share").innerHTML="Mi cuenta"; CRONO=null; PEND=null; MIDIA={fecha:"",ids:[],hechos:[],ops:{}}; COL=VIS=FOT=DIADOC=CRONODOC=null }
 function beat(){ if(ME&&document.visibilityState==="visible") DB.doc("usuarios/"+ME.id).update({lastSeen:new Date().toISOString()}).catch(()=>{}) }
@@ -739,7 +749,7 @@ function startData(){
   UNSUBS.push(DB.doc("ajustes/tipos").onSnapshot(s=>{ EXTRA=(s.exists && s.data().lista)||[] },()=>{}));
   if(ME.isOwner) UNSUBS.push(DB.collection("usuarios").limit(500).onSnapshot(s=>{ USERS={}; s.docs.forEach(d=>USERS[d.id]=d.data()); updOnline(); if(document.getElementById("plist")) personas() },()=>{}));
   updOnline();
-  UNSUBS.push(COL.limit(5000).onSnapshot(s=>{ ONLINE=true; const docs=s.docs.map(d=>({id:d.id,...d.data()})); ALL=docs.filter(c=>!c.borrado); TRASH=docs.filter(c=>c.borrado).sort((a,b)=>(b.borradoEn||"").localeCompare(a.borradoEn||""));
+  UNSUBS.push(COL.limit(5000).onSnapshot(s=>{ ONLINE=true; const docs=s.docs.map(d=>({id:d.id,...d.data()})); snapSave(docs); ALL=docs.filter(c=>!c.borrado); TRASH=docs.filter(c=>c.borrado).sort((a,b)=>(b.borradoEn||"").localeCompare(a.borradoEn||""));
       $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`; if(document.getElementById("trashlist")) papelera(); $("#status").textContent= navigator.onLine?"Sincronizado":"Sin conexión"; render() },
     err=>{ $("#status").textContent="Sin conexión"; if(!ALL.length) toast("No se pudieron cargar los datos") }));
   beat(); HB=setInterval(()=>{ beat(); updOnline() },60000);
@@ -750,10 +760,11 @@ addEventListener("offline",()=>{ if(STARTED) $("#status").textContent="Sin conex
 
 window.boot=function(){
   DB=FB.db; setAMode("login");
+  snapLoad();
   FB.onAuth(async user=>{
     if(MEUNSUB){ try{MEUNSUB()}catch(e){} MEUNSUB=null }
-    stopData(); ME=null; render();
-    if(!user){ showAuth("form"); return }
+    if(!user){ stopData(); ME=null; snapClear(); render(); showAuth("form"); return }
+    if(ME && ME.id!==user.uid){ stopData(); ME=null; snapClear(); render() }
     const ref=DB.doc("usuarios/"+user.uid);
     let creating=false;
     const crear=async()=>{ if(creating) return; creating=true; const base={nombre:user.displayName||$("#a-nombre").value.trim()||user.email.split("@")[0],email:user.email,creado:new Date().toISOString()};
@@ -763,7 +774,7 @@ window.boot=function(){
       if(!u){ if(s.fromCache) return; crear(); showAuth("wait"); return }
       const admin=u.rol==="admin";
       if(u.estado==="aprobado"||admin){ ME={id:user.uid,name:u.nombre||user.displayName||"",email:user.email,isOwner:admin}; $("#me").textContent=ME.name; hideAuth(); startData() }
-      else { stopData(); ME=null; showAuth(u.estado==="pendiente"?"wait":"rech") } },()=>showAuth("wait"));
+      else { stopData(); ME=null; snapClear(); showAuth(u.estado==="pendiente"?"wait":"rech") } },()=>showAuth("wait"));
   });
 };
 </script>
