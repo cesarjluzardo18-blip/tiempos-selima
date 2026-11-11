@@ -16,7 +16,7 @@
 </head>
 <body>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: una columna tipo libreta de ruta — buscador fijo, pueblos en fila, fichas por cliente, hoja inferior para el detalle */
 :root{
@@ -226,7 +226,7 @@ body.auth-on>header,body.auth-on>main,body.auth-on>.fab{display:none!important}
     <div class="top">
       <h1>Tiempos <span>Selima</span></h1>
       <div style="display:flex;align-items:center;gap:10px;min-width:0">
-        <button class="btn" id="share" style="padding:7px 12px;font-size:14px;display:flex;align-items:center;gap:6px"><span class="dot"></span><span id="onN" class="num">1</span> en línea</button>
+        <button class="btn" id="share" style="padding:7px 12px;font-size:14px;display:flex;align-items:center;gap:6px">Mi cuenta</button>
       </div>
     </div>
     <div class="who"><span id="me"></span><span id="clock" class="num"></span></div>
@@ -619,10 +619,16 @@ $("#trash").onclick=papelera;
 /* ---------- personas, en línea y actividad ---------- */
 const isOn=u=> !!(u&&u.lastSeen&&(Date.now()-new Date(u.lastSeen))<150000);
 function agoStr(iso){ if(!iso) return "sin conexiones todavía"; const m=Math.max(1,Math.round((Date.now()-new Date(iso))/60000)); if(m<60) return `visto hace ${m} min`; const h=Math.round(m/60); if(h<24) return `visto hace ${h} h`; const d=new Date(iso); return `visto el ${d.getDate()}/${d.getMonth()+1}` }
-function updOnline(){ const n=Object.values(USERS).filter(u=>u.estado==="aprobado"&&isOn(u)).length; $("#onN").textContent=Math.max(1,n) }
+function updOnline(){ const b=$("#share");
+  if(!(ME&&ME.isOwner)){ b.innerHTML="Mi cuenta"; return }
+  const n=Object.values(USERS).filter(u=>u.estado==="aprobado"&&isOn(u)).length; b.innerHTML=`<span class="dot"></span><span class="num">${Math.max(1,n)}</span> en línea` }
 function sectT(t){ return `<div class="sect">${t}</div>` }
 function personas(){
   const adm=!!(ME&&ME.isOwner);
+  if(!adm){ open(`<div class="sh-head"><div><h3>Mi cuenta</h3><p>${esc(ME.name)}${ME.email?" · "+esc(ME.email):""}</p></div><button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
+    ${sectT("Notificaciones")}<div class="tasks" id="pushbox" style="padding:12px 14px;display:grid;gap:10px"><span class="hint">Comprobando…</span></div>
+    <div class="foot"><span class="by">Has entrado como ${esc(ME.name)}</span><button class="btn" id="p-out">Cerrar sesión</button></div>`);
+    pushBox(); $("#p-out").onclick=async()=>{ close(); try{ await FB.logout() }catch(e){} }; return }
   const L=Object.entries(USERS).map(([id,u])=>({id,...u}));
   const by=(a,b)=>(a.nombre||"").localeCompare(b.nombre||"","es");
   const ap=L.filter(u=>u.estado==="aprobado").sort((a,b)=>(isOn(b)-isOn(a))||by(a,b));
@@ -720,7 +726,7 @@ $("#a-reset").onclick=async()=>{ const em=$("#a-email").value.trim(); if(!em) re
 $("#w-out").onclick=()=>FB.logout();
 
 function stopData(){ UNSUBS.forEach(f=>{ try{f()}catch(e){} }); UNSUBS=[]; STARTED=false; clearInterval(HB);
-  ALL=[]; TRASH=[]; USERS={}; CRONO=null; PEND=null; MIDIA={fecha:"",ids:[],hechos:[],ops:{}}; COL=VIS=FOT=DIADOC=CRONODOC=null }
+  ALL=[]; TRASH=[]; USERS={}; $("#share").innerHTML="Mi cuenta"; CRONO=null; PEND=null; MIDIA={fecha:"",ids:[],hechos:[],ops:{}}; COL=VIS=FOT=DIADOC=CRONODOC=null }
 function beat(){ if(ME&&document.visibilityState==="visible") DB.doc("usuarios/"+ME.id).update({lastSeen:new Date().toISOString()}).catch(()=>{}) }
 document.addEventListener("visibilitychange",beat);
 function startData(){
@@ -731,7 +737,8 @@ function startData(){
   UNSUBS.push(DIADOC.onSnapshot(s=>{ if(s.exists){ const m=s.data(); MIDIA={fecha:m.fecha||"",ids:m.ids||[],hechos:m.hechos||[],ops:m.ops||{}} } render() },()=>{}));
   UNSUBS.push(CRONODOC.onSnapshot(s=>{ const d=s.exists?s.data():null; CRONO= d&&d.activo? d : null; cronoTick(); if(CUR&&$("#cronobox")){ const c=ALL.find(x=>x.id===CUR); if(c) cronoBox(c) } },()=>{}));
   UNSUBS.push(DB.doc("ajustes/tipos").onSnapshot(s=>{ EXTRA=(s.exists && s.data().lista)||[] },()=>{}));
-  UNSUBS.push(DB.collection("usuarios").limit(500).onSnapshot(s=>{ USERS={}; s.docs.forEach(d=>USERS[d.id]=d.data()); updOnline(); if(document.getElementById("plist")) personas() },()=>{}));
+  if(ME.isOwner) UNSUBS.push(DB.collection("usuarios").limit(500).onSnapshot(s=>{ USERS={}; s.docs.forEach(d=>USERS[d.id]=d.data()); updOnline(); if(document.getElementById("plist")) personas() },()=>{}));
+  updOnline();
   UNSUBS.push(COL.limit(5000).onSnapshot(s=>{ ONLINE=true; const docs=s.docs.map(d=>({id:d.id,...d.data()})); ALL=docs.filter(c=>!c.borrado); TRASH=docs.filter(c=>c.borrado).sort((a,b)=>(b.borradoEn||"").localeCompare(a.borradoEn||""));
       $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`; if(document.getElementById("trashlist")) papelera(); $("#status").textContent= navigator.onLine?"Sincronizado":"Sin conexión"; render() },
     err=>{ $("#status").textContent="Sin conexión"; if(!ALL.length) toast("No se pudieron cargar los datos") }));
@@ -748,10 +755,12 @@ window.boot=function(){
     stopData(); ME=null; render();
     if(!user){ showAuth("form"); return }
     const ref=DB.doc("usuarios/"+user.uid);
-    try{ const s=await ref.get(); if(!s.exists){ const base={nombre:user.displayName||$("#a-nombre").value.trim()||user.email.split("@")[0],email:user.email,creado:new Date().toISOString()};
+    let creating=false;
+    const crear=async()=>{ if(creating) return; creating=true; const base={nombre:user.displayName||$("#a-nombre").value.trim()||user.email.split("@")[0],email:user.email,creado:new Date().toISOString()};
       // solo el correo de administrador (definido en las reglas de Firebase) puede crearse como admin
-      try{ await ref.set({...base,estado:"aprobado",rol:"admin"}) }catch(e){ await ref.set({...base,estado:"pendiente",rol:"miembro"}) } } }catch(e){}
-    MEUNSUB=ref.onSnapshot(s=>{ const u=s.exists?s.data():null; if(!u){ showAuth("wait"); return }
+      try{ await ref.set({...base,estado:"aprobado",rol:"admin"}) }catch(e){ try{ await ref.set({...base,estado:"pendiente",rol:"miembro"}) }catch(e2){} } };
+    MEUNSUB=ref.onSnapshot(s=>{ const u=s.exists?s.data():null;
+      if(!u){ if(s.fromCache) return; crear(); showAuth("wait"); return }
       const admin=u.rol==="admin";
       if(u.estado==="aprobado"||admin){ ME={id:user.uid,name:u.nombre||user.displayName||"",email:user.email,isOwner:admin}; $("#me").textContent=ME.name; hideAuth(); startData() }
       else { stopData(); ME=null; showAuth(u.estado==="pendiente"?"wait":"rech") } },()=>showAuth("wait"));
@@ -783,7 +792,7 @@ let fs;
 try { fs = initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }); }
 catch (e) { fs = initializeFirestore(app, {}); }
 
-const snap = s => ({ id: s.id, exists: s.exists(), data: () => s.data() });
+const snap = s => ({ id: s.id, exists: s.exists(), data: () => s.data(), fromCache: !!(s.metadata && s.metadata.fromCache) });
 const wDoc = ref => ({
   get: async () => snap(await getDoc(ref)),
   set: d => setDoc(ref, d), update: d => updateDoc(ref, d), delete: () => deleteDoc(ref),
