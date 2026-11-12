@@ -100,6 +100,9 @@ main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px
 .sh-head h3{font-family:var(--display);font-size:30px;font-weight:700;line-height:1.05;margin:0;text-wrap:balance}
 .sh-head p{margin:4px 0 0;color:var(--muted);font-size:14px}
 .tasks{margin-top:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+.task.mov{grid-template-columns:28px 1fr auto auto}
+.tmv{display:flex;flex-direction:column;gap:4px}
+.tmv .mv{height:26px;width:32px}
 .task{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:12px 14px;border-top:1px solid var(--line)}
 .task:first-child{border-top:0}
 .task input{width:20px;height:20px;accent-color:var(--water)}
@@ -387,9 +390,9 @@ function detail(id){
     <div class="place">${c.direccion?`<span class="addr">${esc(c.direccion)}</span>`:`<span class="hint">Sin dirección. Pulsa «Editar» para añadirla.</span>`}
       <div class="maps"><a class="btn" target="_blank" rel="noopener" href="https://waze.com/ul?q=${encodeURIComponent(mapQ(c))}&navigate=yes">Ir con Waze</a><a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQ(c))}">Google Maps</a><a class="btn" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(mapQ(c))}">Apple Maps</a>
       <button class="btn" id="dia" type="button">${MIDIA.ids.includes(c.id)?"Quitar de Mi día":"+ Mi día"}</button></div></div>
-    <div class="tasks">${ts.length? ts.map((t,i)=>`<label class="task"><input type="checkbox" data-i="${i}" ${t.min!=null?"checked":"disabled"}>
+    <div class="tasks">${ts.length? ts.map((t,i)=>`<label class="task${ts.length>1?" mov":""}"><input type="checkbox" data-i="${i}" ${t.min!=null?"checked":"disabled"}>
         <span class="tn" style="color:var(--ink);font-weight:500">${esc(t.n)}</span>
-        <span class="tt num">${t.min==null? `<span style="font-size:15px">${esc(t.texto||"—")}</span>` : t.ops? `${fmt(t.min)} × ${t.ops}<small>${fmt(tot(t))} en total</small>` : `${fmt(t.min)}<small>en total</small>`}</span></label>`).join("")
+        <span class="tt num">${t.min==null? `<span style="font-size:15px">${esc(t.texto||"—")}</span>` : t.ops? `${fmt(t.min)} × ${t.ops}<small>${fmt(tot(t))} en total</small>` : `${fmt(t.min)}<small>en total</small>`}</span>${ts.length>1?`<span class="tmv"><button type="button" class="mv" data-i="${i}" data-d="-1" aria-label="Subir" ${i===0?"disabled":""}>↑</button><button type="button" class="mv" data-i="${i}" data-d="1" aria-label="Bajar" ${i===ts.length-1?"disabled":""}>↓</button></span>`:""}</label>`).join("")
       : `<div class="task"><span></span><span class="tn">Sin tiempo anotado</span><span></span></div>`}</div>
     ${ts.some(t=>t.min!=null)?`<div class="calc"><div class="big"><span>Trabajo marcado</span><b class="num" id="cT"></b></div>
       <div class="big" style="align-items:center"><div class="stepper"><button type="button" id="mn" aria-label="Menos operarios">−</button><output id="ops" class="num">2</output><button type="button" id="pl" aria-label="Más operarios">+</button><span style="color:var(--muted);font-size:14px">operarios</span></div>
@@ -411,6 +414,11 @@ function detail(id){
     if(c.editado){ const e=await nameOf(c.editadoPorId,c.editadoPor); const d=new Date(c.editado); t+=` · Editado el ${d.getDate()}/${d.getMonth()+1} a las ${pad(d.getHours())}:${pad(d.getMinutes())}${e?" por "+e:""}` }
     const el=document.getElementById("by"); if(el) el.textContent=t })();
   $("#edit").onclick=()=>form(c);
+  document.querySelectorAll(".tmv .mv").forEach(b=>b.onclick=async e=>{ e.preventDefault(); e.stopPropagation();
+    const i=+b.dataset.i, j=i+(+b.dataset.d); if(j<0||j>=ts.length) return;
+    const nt=[...ts]; [nt[i],nt[j]]=[nt[j],nt[i]]; c.tareas=nt;
+    const sh=document.querySelector(".sheet"), st=sh?sh.scrollTop:0; detail(c.id); const s2=document.querySelector(".sheet"); if(s2) s2.scrollTop=st;
+    try{ await COL.doc(c.id).update({tareas:nt}); if(typeof logAct==="function") logAct("cambió el orden de los trabajos de",c.cliente,c.id) }catch(err){ toast("No se pudo guardar el orden. Revisa la conexión.") } });
   $("#dia").onclick=()=>{ const has=MIDIA.ids.includes(c.id);
     const m={fecha:MIDIA.fecha||today(),ids: has? MIDIA.ids.filter(x=>x!==c.id) : [...MIDIA.ids,c.id], hechos:MIDIA.hechos.filter(x=>x!==c.id||!has)};
     saveDia(m); $("#dia").textContent= has? "+ Mi día":"Quitar de Mi día"; toast(has?"Quitado de Mi día":"Añadido a Mi día") };
@@ -526,7 +534,7 @@ function nombreDe(sel,det){
 }
 function trow(t={}){
   const isNewRow=!t.n;
-  return `<div class="trow"><div class="thead"><span>Trabajo</span><span class="tmove"><button type="button" class="mv" data-mv="-1" aria-label="Subir trabajo">↑</button><button type="button" class="mv" data-mv="1" aria-label="Bajar trabajo">↓</button><button type="button" class="x" aria-label="Quitar trabajo">×</button></span></div>
+  return `<div class="trow"><div class="thead"><span>Trabajo</span><span class="tmove"><button type="button" class="x" aria-label="Quitar trabajo">×</button></span></div>
   <div class="tipos">${tiposAll().map(x=>`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(x)}">${esc(x)}</button>`).join("")}<button type="button" class="tipo nuevo">+ Otro (solo esta casa)</button></div>
   <div class="newtipo" hidden><input class="in" placeholder="Solo para esta casa: persianas, placas solares…" aria-label="Otro trabajo para esta casa"><button type="button" class="btn primary">Añadir</button></div>
   <div class="tprev"></div>
