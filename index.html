@@ -522,7 +522,7 @@ async function addFoto(c,file){
 
 /* ---------- formulario ---------- */
 /* tipos de trabajo: base + los que añada el usuario (guardados en ajustes/tipos) */
-const BASE=["Cristales interior","Cristales exterior","Pértiga","Repisas","Marcos","Terrazas","Fachada","Barandillas","Mamparas","Letreros","Abrillantar"];
+const BASE=["Cristales interior","Cristales exterior","Pértiga","Repisas","Marcos","Terrazas","Fachada","Barandillas","Mamparas","Cerramiento","Letreros","Abrillantar"];
 let EXTRA=[];
 let LOCALT=[]; // tipos escritos a mano: solo para la casa que se está editando, no se guardan como botón
 const tiposAll=()=>[...BASE,...LOCALT.filter(x=>!BASE.includes(x))];
