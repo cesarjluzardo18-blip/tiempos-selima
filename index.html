@@ -138,6 +138,11 @@ form label{display:grid;gap:4px;font-size:14px;font-weight:600;color:var(--muted
 .tprev{font-size:14px;color:var(--ink);font-weight:500;min-height:1.2em}
 .tprev:empty::before{content:"Elige qué se limpia";color:var(--muted);font-weight:400}
 .hint{font-size:13px;color:var(--muted);font-weight:400}
+.tmove{display:flex;gap:4px;align-items:center}
+.mv{width:34px;height:30px;border:1px solid var(--line);background:var(--bg);border-radius:8px;font-size:16px;line-height:1;color:var(--ink)}
+.mv:disabled{opacity:.3}
+.tconv{font-size:13px;color:var(--water);font-weight:600;min-height:1em}
+.tconv.bad{color:var(--danger)}
 @media (max-width:420px){.tfields{grid-template-columns:1fr 78px 56px}}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:up .22s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}}}
@@ -521,16 +526,24 @@ function nombreDe(sel,det){
 }
 function trow(t={}){
   const isNewRow=!t.n;
-  return `<div class="trow"><div class="thead"><span>Trabajo</span><button type="button" class="x" aria-label="Quitar trabajo">×</button></div>
+  return `<div class="trow"><div class="thead"><span>Trabajo</span><span class="tmove"><button type="button" class="mv" data-mv="-1" aria-label="Subir trabajo">↑</button><button type="button" class="mv" data-mv="1" aria-label="Bajar trabajo">↓</button><button type="button" class="x" aria-label="Quitar trabajo">×</button></span></div>
   <div class="tipos">${tiposAll().map(x=>`<button type="button" class="tipo" aria-pressed="false" data-t="${esc(x)}">${esc(x)}</button>`).join("")}<button type="button" class="tipo nuevo">+ Otro (solo esta casa)</button></div>
   <div class="newtipo" hidden><input class="in" placeholder="Solo para esta casa: persianas, placas solares…" aria-label="Otro trabajo para esta casa"><button type="button" class="btn primary">Añadir</button></div>
   <div class="tprev"></div>
   <div class="tfields"><label>Detalle (opcional)<input class="in td" value="${esc(isNewRow?"":t.n)}" placeholder="con pértiga, arriba…"></label>
   <label>Tiempo<input class="in tm num" inputmode="text" value="${esc(t.texto? "": timeStr(t.min))}" placeholder="1h30"></label>
-  <label>× pers.<input class="in to num" inputmode="numeric" value="${t.min==null&&!t.texto?"2":(t.ops||"")}" placeholder="—"></label></div></div>` }
+  <label>× pers.<input class="in to num" inputmode="numeric" value="${t.min==null&&!t.texto?"2":(t.ops||"")}" placeholder="—"></label></div><div class="tconv num"></div></div>` }
+function arrows(){ const rows=[...document.querySelectorAll("#trows .trow")]; rows.forEach((r,i)=>{ const u=r.querySelector('[data-mv="-1"]'), d=r.querySelector('[data-mv="1"]'); if(u) u.disabled=i===0; if(d) d.disabled=i===rows.length-1; r.querySelector(".thead span").textContent=`Trabajo ${rows.length>1?i+1:""}`.trim() }) }
 function bindRow(r){
   const prev=()=>{ const sel=[...r.querySelectorAll(".tipo[aria-pressed=true]")].map(b=>b.dataset.t); r.querySelector(".tprev").textContent=nombreDe(sel,r.querySelector(".td").value.trim()) };
-  r.querySelector(".x").onclick=()=>r.remove();
+  r.querySelector(".x").onclick=()=>{ r.remove(); arrows() };
+  r.querySelectorAll(".mv").forEach(b=>b.onclick=()=>{ const up=b.dataset.mv==="-1", sib=up? r.previousElementSibling : r.nextElementSibling;
+    if(!sib||!sib.classList.contains("trow")) return; if(up) sib.before(r); else sib.after(r); arrows(); r.scrollIntoView({block:"nearest",behavior:"smooth"}) });
+  const conv=()=>{ const el=r.querySelector(".tconv"), tm=r.querySelector(".tm").value.trim(), o=+r.querySelector(".to").value.trim()||0;
+    if(!tm){ el.textContent=""; el.classList.remove("bad"); return } const m=parseTime(tm);
+    if(Number.isNaN(m)){ el.textContent="No se entiende. Escribe 45, 1h30 o 2:15"; el.classList.add("bad"); return }
+    el.classList.remove("bad"); el.textContent= o>0? `= ${fmt(m)} por persona × ${o} = ${fmt(m*o)} en total` : `= ${fmt(m)} en total`; };
+  r.querySelector(".tm").addEventListener("input",conv); r.querySelector(".to").addEventListener("input",conv); conv();
   r.querySelector(".td").oninput=prev;
   r.querySelector(".tipos").onclick=e=>{ const b=e.target.closest(".tipo"); if(!b) return;
     if(b.classList.contains("nuevo")){ const n=r.querySelector(".newtipo"); n.hidden=!n.hidden; if(!n.hidden) n.querySelector("input").focus(); return }
@@ -568,9 +581,9 @@ function form(c){
     <p id="err" class="hint" style="color:var(--danger)" hidden></p>
     <div class="foot"><button type="button" class="btn" data-close>Cancelar</button><button class="btn primary" type="submit">Guardar</button></div>
   </form>`);
-  document.querySelectorAll(".trow").forEach(bindRow);
+  document.querySelectorAll(".trow").forEach(bindRow); arrows();
   $("#f-av").onclick=e=>{ const b=e.target.closest("[data-a]"); if(b) b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")==="true"?"false":"true") };
-  $("#addt").onclick=()=>{ $("#trows").insertAdjacentHTML("beforeend",trow({})); bindRow($("#trows").lastElementChild) };
+  $("#addt").onclick=()=>{ $("#trows").insertAdjacentHTML("beforeend",trow({})); bindRow($("#trows").lastElementChild); arrows() };
   const old=c;
   $("#f").onsubmit=async e=>{ e.preventDefault();
     const tareas=[]; let bad="";
