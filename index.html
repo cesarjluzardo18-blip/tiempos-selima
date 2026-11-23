@@ -12,7 +12,17 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0;font-size:14px;font-family:system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0;font-size:14px;font-family:system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}
+.tsels{display:flex;flex-wrap:wrap;gap:6px}
+.tsel{font:inherit;font-size:13px;padding:6px 10px;border-radius:99px;border:1px solid var(--line,#ccc);background:transparent;color:inherit;cursor:pointer;min-height:32px}
+.tsel[aria-pressed=true]{background:#F5B300;border-color:#F5B300;color:#1a1300;font-weight:700;box-shadow:0 0 0 2px rgba(245,179,0,.25)}
+.mypart{color:#9A6700}
+.lock{margin-left:6px;font-size:.8em}
+.privtag{font-weight:600}
+.sharebox{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px dashed var(--line,#ccc);border-radius:12px;font-size:14px}
+.sharebox input{width:20px;height:20px;margin-top:2px}
+.btn.wa{background:#25D366;color:#fff;border-color:#25D366;text-decoration:none}
+</style>
 </head>
 <body>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -286,7 +296,10 @@ body.auth-on>header,body.auth-on>main,body.auth-on>.fab{display:none!important}
 <script>
 const $=s=>document.querySelector(s);
 let DB=null, COL=null, USER=null, ME=null, ALL=[], TRASH=[], zona="Todos", q="", sort="pueblo";
-let VIEW="todos", MIDIA={fecha:"",ids:[],hechos:[],ops:{}}, CRONO=null, DIADOC=null, CRONODOC=null, VIS=null, FOT=null, ONLINE=false;
+let PCOL=null, PFOT=null, SHARED=[], PRIV=[];
+const colOf=c=> c&&c._priv? PCOL : COL, fotOf=c=> c&&c._priv? PFOT : FOT;
+function logC(accion,c,id,extra){ if(c&&c._priv) logAct(accion+" (solo tú)",c.cliente,id,extra); else logAct(accion,c&&c.cliente,id,extra) }
+let VIEW="todos", MIDIA={fecha:"",ids:[],hechos:[],ops:{},sel:{}}, CRONO=null, DIADOC=null, CRONODOC=null, VIS=null, FOT=null, ONLINE=false;
 const AVISOS=["Alarma","Llaves","Avisar antes","Sin almuerzo"];
 const WARN=new Set(["Alarma","Avisar antes"]);
 const today=()=>{ const d=new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}` };
@@ -332,7 +345,7 @@ function rowHTML(c){
   const tt= ts.length===1 && ts[0].ops ? `${fmt(ts[0].min)} <small>× ${ts[0].ops}</small>` :
             T? `${fmt(T)} <small>${ts.length>1? ts.length+" trabajos":"total"}</small>` : `— <small>${ts[0]?.texto? "ver ficha":""}</small>`;
   const tags=(c.avisos||[]).map(a=>`<span class="tag${WARN.has(a)?" warn":""}">${esc(a)}</span>`).join("");
-  return `<button class="row" data-id="${esc(c.id)}"><span class="name">${esc(c.cliente)}${MIDIA.ids.includes(c.id)?'<span class="star" title="En Mi día">★</span>':""}${c.nota?'<span class="flag" title="Tiene nota"></span>':""}${tags}</span>
+  return `<button class="row" data-id="${esc(c.id)}"><span class="name">${esc(c.cliente)}${c._priv?'<span class="lock" title="Solo lo ves tú">🔒</span>':""}${MIDIA.ids.includes(c.id)?'<span class="star" title="En Mi día">★</span>':""}${c.nota?'<span class="flag" title="Tiene nota"></span>':""}${tags}</span>
     <span class="tot num">${tt}</span><span class="sub">${c.barrio?esc(c.barrio)+" · ":""}${esc(sub)}</span></button>`;
 }
 const defOps=c=>{ const o=[...new Set((c.tareas||[]).filter(t=>t.ops).map(t=>t.ops))]; return o.length===1? o[0] : 2 };
@@ -344,22 +357,27 @@ function renderDia(){
   $("#count").textContent=`${L.length} ${L.length===1?"sitio":"sitios"} · ${MIDIA.hechos.filter(h=>MIDIA.ids.includes(h)).length} hechos`;
   if(!L.length){ $("#out").innerHTML=`<div class="empty"><strong>Tu día está vacío</strong>Abre una casa o local y pulsa «Añadir a Mi día». Solo tú ves esta lista.</div>`; return }
   const pp=c=> total(c)/opsDia(c), done=c=>MIDIA.hechos.includes(c.id);
-  const T=L.reduce((s,c)=>s+total(c),0), P=L.reduce((s,c)=>s+pp(c),0), QP=L.filter(c=>!done(c)).reduce((s,c)=>s+pp(c),0), QT=L.filter(c=>!done(c)).reduce((s,c)=>s+total(c),0);
+  const selOf=c=> ((MIDIA.sel||{})[c.id]||[]).filter(i=>(c.tareas||[])[i]&&c.tareas[i].min!=null);
+  const mine=c=>{ const S=selOf(c); return S.length? S.reduce((a,i)=>a+c.tareas[i].min,0) : pp(c) };
+  const T=L.reduce((s,c)=>s+total(c),0), P=L.reduce((s,c)=>s+mine(c),0), QP=L.filter(c=>!done(c)).reduce((s,c)=>s+mine(c),0), QT=L.filter(c=>!done(c)).reduce((s,c)=>s+total(c),0);
   const fd=MIDIA.fecha&&MIDIA.fecha!==today()? `Lista del ${fdate(MIDIA.fecha)}` : "Hoy";
-  $("#out").innerHTML=`<div class="dayhead"><div><span class="hint" style="font-size:14px">${fd} · tiempo de cada uno</span><br><b class="num">${fmt(P)}</b> <span class="hint num" style="font-size:14px">· quedan ${fmt(QP)} cada uno</span><br>
+  $("#out").innerHTML=`<div class="dayhead"><div><span class="hint" style="font-size:14px">${fd} · tu tiempo</span><br><b class="num">${fmt(P)}</b> <span class="hint num" style="font-size:14px">· quedan ${fmt(QP)}</span><br>
       <span class="hint num" style="font-size:14px">${fmt(T)} en total entre todos · quedan ${fmt(QT)}</span></div>
     <button class="btn" id="newday">Empezar día nuevo</button></div>
     <div class="list">${L.map(c=>{ const o=opsDia(c); return `<div class="dayrow ${done(c)?"done":""}"><button class="check" data-h="${esc(c.id)}" aria-pressed="${done(c)}" aria-label="Marcar hecho">✓</button>
       <div style="flex:1;min-width:0;padding:10px 14px 10px 0;display:grid;gap:6px">
-        <button class="row" data-id="${esc(c.id)}" style="padding:0;grid-template-columns:1fr auto"><span class="name">${esc(c.cliente)}</span><span class="tot num">${fmt(total(c)/o)}<small>cada uno</small></span><span class="sub">${esc(c.zona)} · ${fmt(total(c))} en total</span></button>
-        <div class="stepper" style="gap:6px"><button type="button" data-o="${esc(c.id)}" data-d="-1" aria-label="Menos personas" style="width:30px;height:30px;font-size:17px">−</button><output class="num" style="font-size:16px">${o}</output><button type="button" data-o="${esc(c.id)}" data-d="1" aria-label="Más personas" style="width:30px;height:30px;font-size:17px">+</button><span class="hint" style="font-size:13px">personas</span></div>
+        <button class="row" data-id="${esc(c.id)}" style="padding:0;grid-template-columns:1fr auto"><span class="name">${esc(c.cliente)}</span><span class="tot num">${selOf(c).length? `<span class="mypart">${fmt(mine(c))}</span><small>tu parte</small>` : `${fmt(total(c)/o)}<small>cada uno</small>`}</span><span class="sub">${esc(c.zona)} · ${fmt(total(c))} en total</span></button>
+        ${(c.tareas||[]).some(t=>t.min!=null)?`<div class="tsels">${(c.tareas||[]).map((t,i)=>t.min==null?"":`<button type="button" class="tsel" data-sc="${esc(c.id)}" data-si="${i}" aria-pressed="${selOf(c).includes(i)}">${esc(t.n)} · ${fmt(t.min)}</button>`).join("")}</div>`:""}
+        <div class="stepper" style="gap:6px"><button type="button" data-o="${esc(c.id)}" data-d="-1" aria-label="Menos personas" style="width:30px;height:30px;font-size:17px">−</button><output class="num" style="font-size:16px">${o}</output><button type="button" data-o="${esc(c.id)}" data-d="1" aria-label="Más personas" style="width:30px;height:30px;font-size:17px">+</button><span class="hint" style="font-size:13px">personas</span></div>${selOf(c).length?`<span class="hint" style="font-size:13px">Tu parte: <b class="mypart">${fmt(mine(c))}</b> de ${fmt(total(c))} en esta casa</span>`:""}
       </div></div>` }).join("")}</div>
-    <p class="hint" style="margin-top:10px">El tiempo de cada uno es el total anotado de cada sitio dividido entre las personas que vais. Cambia el número en cada sitio.</p>`;
-  $("#newday").onclick=()=>{ if($("#newday").dataset.ok){ saveDia({fecha:today(),ids:[],hechos:[],ops:{}}); toast("Día nuevo empezado") } else { $("#newday").dataset.ok="1"; $("#newday").textContent="¿Vaciar la lista? Toca otra vez" } };
+    <p class="hint" style="margin-top:10px">Toca el trabajo que te toca a ti en cada casa: se marca en color y en tu tiempo solo cuenta eso. Si no marcas ninguno, cuenta el total del sitio dividido entre las personas que vais.</p>`;
+  document.querySelectorAll("[data-sc]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const id=b.dataset.sc, i=+b.dataset.si, cur=((MIDIA.sel||{})[id]||[]);
+    const nx=cur.includes(i)? cur.filter(x=>x!==i) : [...cur,i]; const sel={...(MIDIA.sel||{})}; if(nx.length) sel[id]=nx; else delete sel[id]; saveDia({...MIDIA,sel}) });
+  $("#newday").onclick=()=>{ if($("#newday").dataset.ok){ saveDia({fecha:today(),ids:[],hechos:[],ops:{},sel:{}}); toast("Día nuevo empezado") } else { $("#newday").dataset.ok="1"; $("#newday").textContent="¿Vaciar la lista? Toca otra vez" } };
   document.querySelectorAll("[data-o]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const c=ALL.find(x=>x.id===b.dataset.o); if(!c) return;
     const v=Math.min(9,Math.max(1,opsDia(c)+(+b.dataset.d))); saveDia({...MIDIA,ops:{...(MIDIA.ops||{}),[c.id]:v}}) });
 }
-async function saveDia(m){ if(!m.ops) m.ops=MIDIA.ops||{}; MIDIA=m; render(); if(!DIADOC){ toast("Mi día necesita conexión"); return } try{ await DIADOC.set(MIDIA) }catch(e){ toast("No se pudo guardar Mi día") } }
+async function saveDia(m){ if(!m.ops) m.ops=MIDIA.ops||{}; if(!m.sel) m.sel=MIDIA.sel||{}; MIDIA=m; render(); if(!DIADOC){ toast("Mi día necesita conexión"); return } try{ await DIADOC.set(MIDIA) }catch(e){ toast("No se pudo guardar Mi día") } }
 function render(){
   chips(); renderDia();
   $("#chips").hidden=VIEW==="dia";
@@ -384,12 +402,12 @@ function detail(id){
   const c=ALL.find(x=>x.id===id); if(!c) return;
   const ts=c.tareas||[]; let ops=2;
   setTimeout(()=>{ CUR=id },0);
-  open(`<div class="sh-head"><div><h3>${esc(c.cliente)}</h3><p>${esc(c.zona)}${c.barrio?" · "+esc(c.barrio):""}</p></div>
+  open(`<div class="sh-head"><div><h3>${esc(c.cliente)}</h3><p>${esc(c.zona)}${c.barrio?" · "+esc(c.barrio):""}${c._priv?' · <span class="privtag">🔒 Solo tú</span>':""}</p></div>
       <button class="btn ghost" data-close aria-label="Cerrar">✕</button></div>
     ${(c.avisos||[]).length?`<div class="avisos">${c.avisos.map(a=>`<span class="tag${WARN.has(a)?" warn":""}">${esc(a)}</span>`).join("")}</div>`:""}
     <div class="place">${c.direccion?`<span class="addr">${esc(c.direccion)}</span>`:`<span class="hint">Sin dirección. Pulsa «Editar» para añadirla.</span>`}
       <div class="maps"><a class="btn" target="_blank" rel="noopener" href="https://waze.com/ul?q=${encodeURIComponent(mapQ(c))}&navigate=yes">Ir con Waze</a><a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQ(c))}">Google Maps</a><a class="btn" target="_blank" rel="noopener" href="https://maps.apple.com/?q=${encodeURIComponent(mapQ(c))}">Apple Maps</a>
-      <button class="btn" id="dia" type="button">${MIDIA.ids.includes(c.id)?"Quitar de Mi día":"+ Mi día"}</button></div></div>
+      <button class="btn" id="dia" type="button">${MIDIA.ids.includes(c.id)?"Quitar de Mi día":"+ Mi día"}</button><a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(waText(c))}">Compartir por WhatsApp</a></div></div>
     <div class="tasks">${ts.length? ts.map((t,i)=>`<label class="task${ts.length>1?" mov":""}"><input type="checkbox" data-i="${i}" ${t.min!=null?"checked":"disabled"}>
         <span class="tn" style="color:var(--ink);font-weight:500">${esc(t.n)}</span>
         <span class="tt num">${t.min==null? `<span style="font-size:15px">${esc(t.texto||"—")}</span>` : t.ops? `${fmt(t.min)} × ${t.ops}<small>${fmt(tot(t))} en total</small>` : `${fmt(t.min)}<small>en total</small>`}</span>${ts.length>1?`<span class="tmv"><button type="button" class="mv" data-i="${i}" data-d="-1" aria-label="Subir" ${i===0?"disabled":""}>↑</button><button type="button" class="mv" data-i="${i}" data-d="1" aria-label="Bajar" ${i===ts.length-1?"disabled":""}>↓</button></span>`:""}</label>`).join("")
@@ -418,14 +436,14 @@ function detail(id){
     const i=+b.dataset.i, j=i+(+b.dataset.d); if(j<0||j>=ts.length) return;
     const nt=[...ts]; [nt[i],nt[j]]=[nt[j],nt[i]]; c.tareas=nt;
     const sh=document.querySelector(".sheet"), st=sh?sh.scrollTop:0; detail(c.id); const s2=document.querySelector(".sheet"); if(s2) s2.scrollTop=st;
-    try{ await COL.doc(c.id).update({tareas:nt}); if(typeof logAct==="function") logAct("cambió el orden de los trabajos de",c.cliente,c.id) }catch(err){ toast("No se pudo guardar el orden. Revisa la conexión.") } });
+    try{ await colOf(c).doc(c.id).update({tareas:nt}); logC("cambió el orden de los trabajos de",c,c.id) }catch(err){ toast("No se pudo guardar el orden. Revisa la conexión.") } });
   $("#dia").onclick=()=>{ const has=MIDIA.ids.includes(c.id);
     const m={fecha:MIDIA.fecha||today(),ids: has? MIDIA.ids.filter(x=>x!==c.id) : [...MIDIA.ids,c.id], hechos:MIDIA.hechos.filter(x=>x!==c.id||!has)};
     saveDia(m); $("#dia").textContent= has? "+ Mi día":"Quitar de Mi día"; toast(has?"Quitado de Mi día":"Añadido a Mi día") };
   cronoBox(c); loadFotos(c); loadHist(c);
   $("#fotoin").onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f) addFoto(c,f); e.target.value="" };
   $("#del").onclick=()=>{ $("#cf").innerHTML=`<div class="confirm"><span style="flex:1">¿Mover «${esc(c.cliente)}» a la papelera? Se puede recuperar.</span><button class="btn" id="no">Cancelar</button><button class="btn primary" style="background:var(--danger);color:#fff" id="yes">Borrar</button></div>`;
-    $("#no").onclick=()=>$("#cf").innerHTML=""; $("#yes").onclick=async()=>{ try{ const now=new Date().toISOString(); const u={borrado:true,borradoEn:now,borradoPor:(ME&&ME.name)||""}; if(ME&&ME.id) u.borradoPorId=ME.id; await COL.doc(c.id).update(u); logAct("movió a la papelera",c.cliente,c.id); close(); toast("Movido a la papelera") }catch(e){ toast("No se pudo borrar. Revisa la conexión.") } } };
+    $("#no").onclick=()=>$("#cf").innerHTML=""; $("#yes").onclick=async()=>{ try{ const now=new Date().toISOString(); const u={borrado:true,borradoEn:now,borradoPor:(ME&&ME.name)||""}; if(ME&&ME.id) u.borradoPorId=ME.id; await colOf(c).doc(c.id).update(u); logC("movió a la papelera",c,c.id); close(); toast("Movido a la papelera") }catch(e){ toast("No se pudo borrar. Revisa la conexión.") } } };
 }
 
 /* ---------- mapa, cronómetro, visitas, fotos ---------- */
@@ -490,8 +508,8 @@ async function loadHist(c){
 }
 async function loadFotos(c){
   const el=$("#fotos"); if(!el) return;
-  if(!FOT){ el.innerHTML=`<span class="hint">Las fotos necesitan conexión.</span>`; return }
-  try{ const s=await FOT.where("clienteId","==",c.id).get(); if(!document.getElementById("fotos")) return;
+  if(!fotOf(c)){ el.innerHTML=`<span class="hint">Las fotos necesitan conexión.</span>`; return }
+  try{ const s=await fotOf(c).where("clienteId","==",c.id).get(); if(!document.getElementById("fotos")) return;
     const L=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.cuando||"").localeCompare(b.cuando||""));
     el.innerHTML= L.length? L.map((f,i)=>`<button type="button" data-f="${i}" aria-label="Ver foto"><img src="${f.img}" alt="Foto de ${esc(c.cliente)}"></button>`).join("") : `<span class="hint">Sin fotos. Añade la fachada, dónde están las llaves o el agua.</span>`;
     el.onclick=e=>{ const b=e.target.closest("[data-f]"); if(b) viewer(c,L[+b.dataset.f]) } }
@@ -505,7 +523,7 @@ function viewer(c,f){
   v.querySelector("#vclose").onclick=()=>v.remove();
   v.onclick=e=>{ if(e.target===v) v.remove() };
   const d=v.querySelector("#vdel"); if(d) d.onclick=async()=>{ if(!d.dataset.ok){ d.dataset.ok="1"; d.textContent="¿Seguro? Toca otra vez"; return }
-    try{ await FOT.doc(f.id).delete(); logAct("quitó una foto",c.cliente,c.id); v.remove(); toast("Foto quitada"); loadFotos(c) }catch(e){ toast("No se pudo quitar") } };
+    try{ await fotOf(c).doc(f.id).delete(); logC("quitó una foto",c,c.id); v.remove(); toast("Foto quitada"); loadFotos(c) }catch(e){ toast("No se pudo quitar") } };
 }
 function shrink(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onerror=rej; r.onload=()=>{ const im=new Image(); im.onerror=rej; im.onload=()=>{
   let max=1280, q=.72, out="";
@@ -513,10 +531,10 @@ function shrink(file){ return new Promise((res,rej)=>{ const r=new FileReader();
     cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height); out=cv.toDataURL("image/jpeg",q); if(out.length<300000) break; max*=.8; q=Math.max(.5,q-.06) }
   res(out) }; im.src=r.result }; r.readAsDataURL(file) }) }
 async function addFoto(c,file){
-  if(!FOT){ toast("Las fotos necesitan conexión"); return }
+  if(!fotOf(c)){ toast("Las fotos necesitan conexión"); return }
   toast("Subiendo foto…");
   try{ const img=await shrink(file); const d={clienteId:c.id,img,cuando:new Date().toISOString(),por:(ME&&ME.name)||""}; if(ME&&ME.id) d.porId=ME.id;
-    await FOT.add(d); logAct("añadió una foto",c.cliente,c.id); toast("Foto guardada"); loadFotos(c) }
+    await fotOf(c).add(d); logC("añadió una foto",c,c.id); toast("Foto guardada"); loadFotos(c) }
   catch(e){ toast("No se pudo guardar la foto") }
 }
 
@@ -567,6 +585,11 @@ function bindRow(r){
   nt.querySelector("input").onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); addTipo() } };
   prev();
 }
+async function moveFotos(id){ if(!PFOT||!FOT) return; try{ const s=await PFOT.where("clienteId","==",id).get(); for(const f of s.docs){ const d=f.data(); await FOT.add(d); await PFOT.doc(f.id).delete() } }catch(e){} }
+function waText(c){ const L=[`*${c.cliente}*`, [c.zona,c.barrio].filter(Boolean).join(" · ")]; if(c.direccion) L.push("📍 "+c.direccion);
+  const ts=c.tareas||[]; if(ts.length){ L.push("","*Trabajos:*"); ts.forEach(t=>L.push(`• ${t.n}: ${t.min==null? (t.texto||"—") : t.ops? `${fmt(t.min)} × ${t.ops} pers. (${fmt(tot(t))})` : fmt(t.min)}`)); if(total(c)) L.push(`*Total: ${fmt(total(c))}*`) }
+  if((c.avisos||[]).length) L.push("","⚠️ "+c.avisos.join(" · ")); if(c.nota) L.push("","📝 "+c.nota);
+  return L.filter((x,i)=>x||i>1).join("\n") }
 function form(c){
   LOCALT=[];
   const isNew=!c; c=c||{zona:zona!=="Todos"?zona:"",barrio:"",cliente:"",tareas:[{}],nota:"",autor:"César"};
@@ -586,6 +609,7 @@ function form(c){
     <label>Nota<textarea class="in" id="f-nota" rows="3" placeholder="Dónde están las llaves, el agua, cosas a tener en cuenta…">${esc(c.nota)}</textarea></label>
     <div class="two dt"><label>Anotado por<input class="in" id="f-autor" value="${esc(isNew?(ME&&ME.name)||"":c.autor)}" placeholder="Tu nombre" ${isNew&&ME&&ME.name?"readonly":""}></label>
       <label>Fecha y hora<input class="in" id="f-cuando" type="datetime-local" value="${esc(c.cuando? localInput(new Date(c.cuando)) : c.fecha? c.fecha+"T00:00" : localInput(new Date()))}"></label></div>
+    ${ME&&ME.isOwner&&(isNew||c._priv)?`<label class="sharebox"><input type="checkbox" id="f-share"> <span><b>Compartir con el equipo</b><br><span class="hint">Si no lo marcas, solo lo ves tú.</span></span></label>`:""}
     <p id="err" class="hint" style="color:var(--danger)" hidden></p>
     <div class="foot"><button type="button" class="btn" data-close>Cancelar</button><button class="btn primary" type="submit">Guardar</button></div>
   </form>`);
@@ -608,7 +632,12 @@ function form(c){
     d.cuando=dt.toISOString(); d.fecha=`${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
     if(isNew){ if(ME&&ME.id) d.autorId=ME.id }
     else { if(old.autorId) d.autorId=old.autorId; d.editado=new Date().toISOString(); if(ME){ d.editadoPor=ME.name||""; if(ME.id) d.editadoPorId=ME.id } }
-    try{ if(isNew){ const ref=await COL.add(d); logAct("añadió",d.cliente,ref&&ref.id) } else { await COL.doc(old.id).set(d); logAct("editó",d.cliente,old.id) } close(); toast("Guardado") }
+    const share=!!($("#f-share")&&$("#f-share").checked), priv=ME&&ME.isOwner&&PCOL&&(isNew? !share : !!old._priv&&!share);
+    try{
+      if(isNew){ const ref=await (priv?PCOL:COL).add(d); logC("añadió",{...d,_priv:priv},ref&&ref.id) }
+      else if(old._priv&&!priv){ await COL.doc(old.id).set(d); await moveFotos(old.id); await PCOL.doc(old.id).delete(); logAct("añadió",d.cliente,old.id) }
+      else { await colOf(old).doc(old.id).set(d); logC("editó",{...d,_priv:!!old._priv},old.id) }
+      close(); toast(priv?"Guardado · solo lo ves tú":"Guardado") }
     catch(err){ $("#err").textContent="No se pudo guardar. Revisa la conexión y vuelve a intentarlo."; $("#err").hidden=false }
   };
 }
@@ -630,11 +659,11 @@ function papelera(){
     <div class="tasks" id="trashlist">${items||'<div class="task" style="grid-template-columns:1fr"><span class="hint">La papelera está vacía.</span></div>'}</div><div id="tcf"></div>`);
   $("#trashlist").onclick=async e=>{
     const r=e.target.closest("[data-rec]"), k=e.target.closest("[data-kill]");
-    if(r){ try{ const rc=TRASH.find(x=>x.id===r.dataset.rec); await COL.doc(r.dataset.rec).update({borrado:false,recuperadoEn:new Date().toISOString(),recuperadoPor:(ME&&ME.name)||""}); logAct("recuperó de la papelera",rc&&rc.cliente,r.dataset.rec); toast("Recuperado") }catch(err){ toast("No se pudo recuperar. Revisa la conexión.") } }
+    if(r){ try{ const rc=TRASH.find(x=>x.id===r.dataset.rec); await colOf(rc).doc(r.dataset.rec).update({borrado:false,recuperadoEn:new Date().toISOString(),recuperadoPor:(ME&&ME.name)||""}); logC("recuperó de la papelera",rc,r.dataset.rec); toast("Recuperado") }catch(err){ toast("No se pudo recuperar. Revisa la conexión.") } }
     if(k){ const c=TRASH.find(x=>x.id===k.dataset.kill); if(!c) return;
       $("#tcf").innerHTML=`<div class="confirm"><span style="flex:1">¿Borrar «${esc(c.cliente)}» para siempre? No se podrá recuperar.</span><button class="btn" id="tno">Cancelar</button><button class="btn primary" style="background:var(--danger);color:#fff" id="tyes">Borrar</button></div>`;
       $("#tno").onclick=()=>$("#tcf").innerHTML="";
-      $("#tyes").onclick=async()=>{ try{ await COL.doc(c.id).delete(); logAct("borró para siempre",c.cliente,c.id,`${c.zona} · ${(c.tareas||[]).map(t=>t.n).join(", ")}`); $("#tcf").innerHTML=""; toast("Borrado para siempre") }catch(err){ toast("No se pudo borrar. Revisa la conexión.") } } }
+      $("#tyes").onclick=async()=>{ try{ await colOf(c).doc(c.id).delete(); logC("borró para siempre",c,c.id,`${c.zona} · ${(c.tareas||[]).map(t=>t.n).join(", ")}`); $("#tcf").innerHTML=""; toast("Borrado para siempre") }catch(err){ toast("No se pudo borrar. Revisa la conexión.") } } }
   };
 }
 $("#trash").onclick=papelera;
@@ -754,26 +783,29 @@ let SNAPT=null;
 function snapSave(docs){ clearTimeout(SNAPT); SNAPT=setTimeout(()=>{ try{ if(ME) localStorage.setItem(SNAPK,JSON.stringify({me:ME,docs,midia:MIDIA,t:Date.now()})) }catch(e){} },800) }
 function snapClear(){ try{ localStorage.removeItem(SNAPK) }catch(e){} }
 function snapLoad(){ try{ const c=JSON.parse(localStorage.getItem(SNAPK)||"null"); if(!c||!c.me||!c.docs) return false;
-  ME=c.me; $("#me").textContent=ME.name||""; if(c.midia&&c.midia.ids) MIDIA={ops:{},...c.midia};
+  ME=c.me; $("#me").textContent=ME.name||""; if(c.midia&&c.midia.ids) MIDIA={ops:{},sel:{},...c.midia};
   ALL=c.docs.filter(x=>!x.borrado); TRASH=c.docs.filter(x=>x.borrado);
   $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`;
   hideAuth(); updOnline(); setView(VIEW); $("#status").textContent="Actualizando…"; return true }catch(e){ return false } }
 function stopData(){ UNSUBS.forEach(f=>{ try{f()}catch(e){} }); UNSUBS=[]; STARTED=false; clearInterval(HB);
-  ALL=[]; TRASH=[]; USERS={}; $("#share").innerHTML="Mi cuenta"; CRONO=null; PEND=null; MIDIA={fecha:"",ids:[],hechos:[],ops:{}}; COL=VIS=FOT=DIADOC=CRONODOC=null }
+  ALL=[]; TRASH=[]; USERS={}; $("#share").innerHTML="Mi cuenta"; CRONO=null; PEND=null; MIDIA={fecha:"",ids:[],hechos:[],ops:{},sel:{}}; COL=VIS=FOT=DIADOC=CRONODOC=PCOL=PFOT=null; SHARED=[]; PRIV=[] }
 function beat(){ if(ME&&document.visibilityState==="visible") DB.doc("usuarios/"+ME.id).update({lastSeen:new Date().toISOString()}).catch(()=>{}) }
 document.addEventListener("visibilitychange",beat);
+function mergeDocs(){ const docs=[...SHARED,...PRIV]; snapSave(docs); ALL=docs.filter(c=>!c.borrado); TRASH=docs.filter(c=>c.borrado).sort((a,b)=>(b.borradoEn||"").localeCompare(a.borradoEn||""));
+  $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`; if(document.getElementById("trashlist")) papelera(); render() }
 function startData(){
   if(STARTED) return; STARTED=true;
   COL=DB.collection("clientes"); FOT=DB.collection("fotos");
+  if(ME.isOwner){ PCOL=DB.collection("data/users/"+ME.id+"/clientes"); PFOT=DB.collection("data/users/"+ME.id+"/fotos");
+    UNSUBS.push(PCOL.limit(3000).onSnapshot(s=>{ PRIV=s.docs.map(d=>({id:d.id,...d.data(),_priv:true})); mergeDocs() },()=>{})) }
   const P=DB.collection("data/users/"+ME.id); DIADOC=P.doc("midia"); CRONODOC=P.doc("crono"); VIS=DB.collection("data/users/"+ME.id+"/registro/visitas");
   setView(VIEW);
-  UNSUBS.push(DIADOC.onSnapshot(s=>{ if(s.exists){ const m=s.data(); MIDIA={fecha:m.fecha||"",ids:m.ids||[],hechos:m.hechos||[],ops:m.ops||{}} } render() },()=>{}));
+  UNSUBS.push(DIADOC.onSnapshot(s=>{ if(s.exists){ const m=s.data(); MIDIA={fecha:m.fecha||"",ids:m.ids||[],hechos:m.hechos||[],ops:m.ops||{},sel:m.sel||{}} } render() },()=>{}));
   UNSUBS.push(CRONODOC.onSnapshot(s=>{ const d=s.exists?s.data():null; CRONO= d&&d.activo? d : null; cronoTick(); if(CUR&&$("#cronobox")){ const c=ALL.find(x=>x.id===CUR); if(c) cronoBox(c) } },()=>{}));
   UNSUBS.push(DB.doc("ajustes/tipos").onSnapshot(s=>{ EXTRA=(s.exists && s.data().lista)||[] },()=>{}));
   if(ME.isOwner) UNSUBS.push(DB.collection("usuarios").limit(500).onSnapshot(s=>{ USERS={}; s.docs.forEach(d=>USERS[d.id]=d.data()); updOnline(); if(document.getElementById("plist")) personas() },()=>{}));
   updOnline();
-  UNSUBS.push(COL.limit(5000).onSnapshot(s=>{ ONLINE=true; const docs=s.docs.map(d=>({id:d.id,...d.data()})); snapSave(docs); ALL=docs.filter(c=>!c.borrado); TRASH=docs.filter(c=>c.borrado).sort((a,b)=>(b.borradoEn||"").localeCompare(a.borradoEn||""));
-      $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`; if(document.getElementById("trashlist")) papelera(); $("#status").textContent= navigator.onLine?"Sincronizado":"Sin conexión"; render() },
+  UNSUBS.push(COL.limit(5000).onSnapshot(s=>{ ONLINE=true; SHARED=s.docs.map(d=>({id:d.id,...d.data()})); mergeDocs(); $("#status").textContent= navigator.onLine?"Sincronizado":"Sin conexión" },
     err=>{ $("#status").textContent="Sin conexión"; if(!ALL.length) toast("No se pudieron cargar los datos") }));
   beat(); HB=setInterval(()=>{ beat(); updOnline() },60000);
   pushRefresh();
