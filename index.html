@@ -438,7 +438,7 @@ function detail(id){
     const sh=document.querySelector(".sheet"), st=sh?sh.scrollTop:0; detail(c.id); const s2=document.querySelector(".sheet"); if(s2) s2.scrollTop=st;
     try{ await colOf(c).doc(c.id).update({tareas:nt}); logC("cambió el orden de los trabajos de",c,c.id) }catch(err){ toast("No se pudo guardar el orden. Revisa la conexión.") } });
   $("#dia").onclick=()=>{ const has=MIDIA.ids.includes(c.id);
-    const m={fecha:MIDIA.fecha||today(),ids: has? MIDIA.ids.filter(x=>x!==c.id) : [...MIDIA.ids,c.id], hechos:MIDIA.hechos.filter(x=>x!==c.id||!has)};
+    const m={fecha:today(),ids: has? MIDIA.ids.filter(x=>x!==c.id) : [...MIDIA.ids,c.id], hechos:MIDIA.hechos.filter(x=>x!==c.id||!has)};
     saveDia(m); $("#dia").textContent= has? "+ Mi día":"Quitar de Mi día"; toast(has?"Quitado de Mi día":"Añadido a Mi día") };
   cronoBox(c); loadFotos(c); loadHist(c);
   $("#fotoin").onchange=e=>{ const f=e.target.files&&e.target.files[0]; if(f) addFoto(c,f); e.target.value="" };
@@ -783,7 +783,7 @@ let SNAPT=null;
 function snapSave(docs){ clearTimeout(SNAPT); SNAPT=setTimeout(()=>{ try{ if(ME) localStorage.setItem(SNAPK,JSON.stringify({me:ME,docs,midia:MIDIA,t:Date.now()})) }catch(e){} },800) }
 function snapClear(){ try{ localStorage.removeItem(SNAPK) }catch(e){} }
 function snapLoad(){ try{ const c=JSON.parse(localStorage.getItem(SNAPK)||"null"); if(!c||!c.me||!c.docs) return false;
-  ME=c.me; $("#me").textContent=ME.name||""; if(c.midia&&c.midia.ids) MIDIA={ops:{},sel:{},...c.midia};
+  ME=c.me; $("#me").textContent=ME.name||""; if(c.midia&&c.midia.ids&&c.midia.fecha===today()) MIDIA={ops:{},sel:{},...c.midia};
   ALL=c.docs.filter(x=>!x.borrado); TRASH=c.docs.filter(x=>x.borrado);
   $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`;
   hideAuth(); updOnline(); setView(VIEW); $("#status").textContent="Actualizando…"; return true }catch(e){ return false } }
@@ -795,12 +795,16 @@ function mergeDocs(){ const docs=[...SHARED,...PRIV]; snapSave(docs); ALL=docs.f
   $("#trash").hidden=!TRASH.length; $("#trash").textContent=`Papelera (${TRASH.length})`; if(document.getElementById("trashlist")) papelera(); render() }
 function startData(){
   if(STARTED) return; STARTED=true;
+  try{ startDataInner() }catch(e){ STARTED=false; console.error(e); $("#status").textContent="Error al conectar"; toast("No se pudo conectar con los datos. Cierra y abre la app.") }
+}
+function startDataInner(){
   COL=DB.collection("clientes"); FOT=DB.collection("fotos");
-  if(ME.isOwner){ PCOL=DB.collection("data/users/"+ME.id+"/clientes"); PFOT=DB.collection("data/users/"+ME.id+"/fotos");
+  if(ME.isOwner){ PCOL=DB.collection("data/users/"+ME.id+"/privado/clientes"); PFOT=DB.collection("data/users/"+ME.id+"/privado/fotos");
     UNSUBS.push(PCOL.limit(3000).onSnapshot(s=>{ PRIV=s.docs.map(d=>({id:d.id,...d.data(),_priv:true})); mergeDocs() },()=>{})) }
   const P=DB.collection("data/users/"+ME.id); DIADOC=P.doc("midia"); CRONODOC=P.doc("crono"); VIS=DB.collection("data/users/"+ME.id+"/registro/visitas");
   setView(VIEW);
-  UNSUBS.push(DIADOC.onSnapshot(s=>{ if(s.exists){ const m=s.data(); MIDIA={fecha:m.fecha||"",ids:m.ids||[],hechos:m.hechos||[],ops:m.ops||{},sel:m.sel||{}} } render() },()=>{}));
+  UNSUBS.push(DIADOC.onSnapshot(s=>{ if(s.exists){ const m=s.data(); MIDIA={fecha:m.fecha||"",ids:m.ids||[],hechos:m.hechos||[],ops:m.ops||{},sel:m.sel||{}};
+    if(!s.fromCache && MIDIA.ids.length && MIDIA.fecha!==today()){ saveDia({fecha:today(),ids:[],hechos:[],ops:{},sel:{}}); return } } render() },()=>{}));
   UNSUBS.push(CRONODOC.onSnapshot(s=>{ const d=s.exists?s.data():null; CRONO= d&&d.activo? d : null; cronoTick(); if(CUR&&$("#cronobox")){ const c=ALL.find(x=>x.id===CUR); if(c) cronoBox(c) } },()=>{}));
   UNSUBS.push(DB.doc("ajustes/tipos").onSnapshot(s=>{ EXTRA=(s.exists && s.data().lista)||[] },()=>{}));
   if(ME.isOwner) UNSUBS.push(DB.collection("usuarios").limit(500).onSnapshot(s=>{ USERS={}; s.docs.forEach(d=>USERS[d.id]=d.data()); updOnline(); if(document.getElementById("plist")) personas() },()=>{}));
