@@ -15,8 +15,9 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0;font-size:14px;font-family:system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}
 .tsels{display:flex;flex-wrap:wrap;gap:6px}
 .tsel{font:inherit;font-size:13px;padding:6px 10px;border-radius:99px;border:1px solid var(--line,#ccc);background:transparent;color:inherit;cursor:pointer;min-height:32px}
-.tsel[aria-pressed=true]{background:#F5B300;border-color:#F5B300;color:#1a1300;font-weight:700;box-shadow:0 0 0 2px rgba(245,179,0,.25)}
-.mypart{color:#9A6700}
+.tsel[aria-pressed=true]{background:#16A34A;border-color:#16A34A;color:#fff;font-weight:700;text-decoration:underline;text-underline-offset:3px;box-shadow:0 0 0 2px rgba(22,163,74,.25)}
+.mypart{color:#15803D}
+@media (prefers-color-scheme:dark){.mypart{color:#4ADE80}}
 .lock{margin-left:6px;font-size:.8em}
 .privtag{font-weight:600}
 .sharebox{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px dashed var(--line,#ccc);border-radius:12px;font-size:14px}
@@ -350,6 +351,7 @@ function rowHTML(c){
 }
 const defOps=c=>{ const o=[...new Set((c.tareas||[]).filter(t=>t.ops).map(t=>t.ops))]; return o.length===1? o[0] : 2 };
 const opsDia=c=> (MIDIA.ops&&MIDIA.ops[c.id]) || defOps(c);
+let DIAEXP=new Set();
 function renderDia(){
   const n=MIDIA.ids.length; $("#diaN").hidden=!n; $("#diaN").textContent=n;
   if(VIEW!=="dia") return;
@@ -362,17 +364,19 @@ function renderDia(){
   const T=L.reduce((s,c)=>s+total(c),0), P=L.reduce((s,c)=>s+mine(c),0), QP=L.filter(c=>!done(c)).reduce((s,c)=>s+mine(c),0), QT=L.filter(c=>!done(c)).reduce((s,c)=>s+total(c),0);
   const fd=MIDIA.fecha&&MIDIA.fecha!==today()? `Lista del ${fdate(MIDIA.fecha)}` : "Hoy";
   $("#out").innerHTML=`<div class="dayhead"><div><span class="hint" style="font-size:14px">${fd} · tu tiempo</span><br><b class="num">${fmt(P)}</b> <span class="hint num" style="font-size:14px">· quedan ${fmt(QP)}</span><br>
-      <span class="hint num" style="font-size:14px">${fmt(T)} en total entre todos · quedan ${fmt(QT)}</span></div>
+      ${L.some(c=>selOf(c).length)?"":`<span class="hint num" style="font-size:14px">${fmt(T)} en total entre todos · quedan ${fmt(QT)}</span>`}</div>
     <button class="btn" id="newday">Empezar día nuevo</button></div>
     <div class="list">${L.map(c=>{ const o=opsDia(c); return `<div class="dayrow ${done(c)?"done":""}"><button class="check" data-h="${esc(c.id)}" aria-pressed="${done(c)}" aria-label="Marcar hecho">✓</button>
       <div style="flex:1;min-width:0;padding:10px 14px 10px 0;display:grid;gap:6px">
-        <button class="row" data-id="${esc(c.id)}" style="padding:0;grid-template-columns:1fr auto"><span class="name">${esc(c.cliente)}</span><span class="tot num">${selOf(c).length? `<span class="mypart">${fmt(mine(c))}</span><small>tu parte</small>` : `${fmt(total(c)/o)}<small>cada uno</small>`}</span><span class="sub">${esc(c.zona)} · ${fmt(total(c))} en total</span></button>
-        ${(c.tareas||[]).some(t=>t.min!=null)?`<div class="tsels">${(c.tareas||[]).map((t,i)=>t.min==null?"":`<button type="button" class="tsel" data-sc="${esc(c.id)}" data-si="${i}" aria-pressed="${selOf(c).includes(i)}">${esc(t.n)} · ${fmt(t.min)}</button>`).join("")}</div>`:""}
-        <div class="stepper" style="gap:6px"><button type="button" data-o="${esc(c.id)}" data-d="-1" aria-label="Menos personas" style="width:30px;height:30px;font-size:17px">−</button><output class="num" style="font-size:16px">${o}</output><button type="button" data-o="${esc(c.id)}" data-d="1" aria-label="Más personas" style="width:30px;height:30px;font-size:17px">+</button><span class="hint" style="font-size:13px">personas</span></div>${selOf(c).length?`<span class="hint" style="font-size:13px">Tu parte: <b class="mypart">${fmt(mine(c))}</b> de ${fmt(total(c))} en esta casa</span>`:""}
+        <button class="row" data-id="${esc(c.id)}" style="padding:0;grid-template-columns:1fr auto"><span class="name">${esc(c.cliente)}</span><span class="tot num">${selOf(c).length? `<span class="mypart">${fmt(mine(c))}</span><small>tu parte</small>` : `${fmt(total(c)/o)}<small>cada uno</small>`}</span><span class="sub">${esc(c.zona)}${selOf(c).length?"":` · ${fmt(total(c))} en total`}</span></button>
+        ${(c.tareas||[]).some(t=>t.min!=null)?(()=>{ const S=selOf(c), all=!S.length||DIAEXP.has(c.id);
+          return `<div class="tsels">${(c.tareas||[]).map((t,i)=>t.min==null||(!all&&!S.includes(i))?"":`<button type="button" class="tsel" data-sc="${esc(c.id)}" data-si="${i}" aria-pressed="${S.includes(i)}">${esc(t.n)} · ${fmt(t.min)}</button>`).join("")}${S.length?`<button type="button" class="tsel" data-exp="${esc(c.id)}" style="border-style:dashed">${DIAEXP.has(c.id)?"Listo":"Cambiar"}</button>`:""}</div>` })():""}
+        <div class="stepper" style="gap:6px${selOf(c).length?";display:none":""}"><button type="button" data-o="${esc(c.id)}" data-d="-1" aria-label="Menos personas" style="width:30px;height:30px;font-size:17px">−</button><output class="num" style="font-size:16px">${o}</output><button type="button" data-o="${esc(c.id)}" data-d="1" aria-label="Más personas" style="width:30px;height:30px;font-size:17px">+</button><span class="hint" style="font-size:13px">personas</span></div>${selOf(c).length?`<span class="hint" style="font-size:13px">Tu parte: <b class="mypart">${fmt(mine(c))}</b></span>`:""}
       </div></div>` }).join("")}</div>
-    <p class="hint" style="margin-top:10px">Toca el trabajo que te toca a ti en cada casa: se marca en color y en tu tiempo solo cuenta eso. Si no marcas ninguno, cuenta el total del sitio dividido entre las personas que vais.</p>`;
+    <p class="hint" style="margin-top:10px">Toca el trabajo que te toca a ti en cada casa: desde ese momento solo verás ese trabajo y solo se suma ese tiempo. Pulsa «Cambiar» para elegir otro. Si no marcas ninguno, cuenta el total del sitio dividido entre las personas que vais.</p>`;
   document.querySelectorAll("[data-sc]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const id=b.dataset.sc, i=+b.dataset.si, cur=((MIDIA.sel||{})[id]||[]);
     const nx=cur.includes(i)? cur.filter(x=>x!==i) : [...cur,i]; const sel={...(MIDIA.sel||{})}; if(nx.length) sel[id]=nx; else delete sel[id]; saveDia({...MIDIA,sel}) });
+  document.querySelectorAll("[data-exp]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const id=b.dataset.exp; DIAEXP.has(id)?DIAEXP.delete(id):DIAEXP.add(id); renderDia() });
   $("#newday").onclick=()=>{ if($("#newday").dataset.ok){ saveDia({fecha:today(),ids:[],hechos:[],ops:{},sel:{}}); toast("Día nuevo empezado") } else { $("#newday").dataset.ok="1"; $("#newday").textContent="¿Vaciar la lista? Toca otra vez" } };
   document.querySelectorAll("[data-o]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const c=ALL.find(x=>x.id===b.dataset.o); if(!c) return;
     const v=Math.min(9,Math.max(1,opsDia(c)+(+b.dataset.d))); saveDia({...MIDIA,ops:{...(MIDIA.ops||{}),[c.id]:v}}) });
